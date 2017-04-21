@@ -1,0 +1,6 @@
+[package]
+name = "playground_library"
+version = "0.1.0"
+authors = ["cbreeden <github@u.breeden.cc>"]
+
+[dependencies]
