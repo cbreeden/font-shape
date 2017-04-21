@@ -22,10 +22,10 @@ pub fn be_u16(buf: &[u8]) -> u16 {
 
 /// Panics if buf.len() < 2.
 pub fn be_u32(buf: &[u8]) -> u32 {
-    ((buf[3] as u32) << 24)
-    | ((buf[2] as u32) << 16)
-    | ((buf[1] as u32) << 8)
-    |  (buf[0] as u32)
+    ((buf[0] as u32) << 24)
+    | ((buf[1] as u32) << 16)
+    | ((buf[2] as u32) << 8)
+    |  (buf[3] as u32)
 }
 
 pub fn be_i16(buf: &[u8]) -> i16 {

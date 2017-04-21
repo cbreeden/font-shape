@@ -173,7 +173,7 @@ mod test {
         use std::io::BufReader;
         use std::io::prelude::*;
 
-        let file = File::open(r"C:\Users\breeden\git\fonttools\data\Kleymissky_0283.otf")
+        let file = File::open(r"data/OpenSans-Regular.ttf")
             .expect("Unable to open file");
         let mut reader = BufReader::new(file);
         let mut data   = Vec::new();
@@ -184,10 +184,10 @@ mod test {
             .expect("Unable to parse font");
 
         for _ in 0..font.num_tables {
-            let res   = OffsetTable::parse(data)?;
+            let res   = OffsetTable::parse(data).unwrap();
             data = res.0;
 
-            println!("{:?}", res.0);
+            println!("{:?}", res.1);
         }
 
         println!("{:?}", font);
