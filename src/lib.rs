@@ -1,6 +1,10 @@
 #![allow(dead_code)]
+extern crate byteorder;
+
+#[macro_use]
+mod util;
 mod font;
-mod parse;
+mod decode;
 
 #[cfg(test)]
 mod tests {

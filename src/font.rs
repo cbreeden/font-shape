@@ -1,6 +1,7 @@
-use parse;
-use parse::Parse;
-use parse::{Error, Result};
+use decode;
+use decode::primitives::{Tag, Offset32, Ignore6};
+use decode::Parse;
+use decode::{Error, Result};
 
 #[derive(Debug)]
 pub enum Version {
@@ -11,29 +12,25 @@ pub enum Version {
 impl Parse for Version {
     fn size() -> usize { 4 }
     fn parse(buf: &[u8]) -> Result<(&[u8], Version)> {
-        const TRUE: u32     = 0x74727565; // deprecated Mac format (TrueType)
-        const TYP1: u32     = 0x74797031; // deprecated Mac format (TrueType)
-        const VERSION1: u32 = 0x00010000; // TrueType
-        const OTTO: u32     = 0x4f54544f; // OpenType
+        const VERSION1: [u8; 4] = [0x00, 0x01, 0x00, 0x00];
 
         if buf.len() < Self::size() {
             return Err(Error::UnexpectedEof)
         }
 
-        let val = parse::be_u32(buf);
-        let buf = &buf[Self::size()..];
-        Ok((buf, match val {
-            OTTO => Version::OpenType,
-            VERSION1 | TRUE | TYP1 => Version::TrueType,
-
-            // TODO: Investigate if providing a default is fine.
+        let (buf, tag) = Tag::parse(buf)?;
+        let ver = match &tag.0 {
+            b"OTTO" => Version::OpenType,
+            &VERSION1 | b"true" | b"typ1" => Version::TrueType,
             _ => return Err(Error::InvalidData),
-        }))
+        };
+
+        Ok((buf, ver))
     }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum Tag {
+pub enum TableTag {
     // Required Tables
     Cmap,
     Head,
@@ -49,8 +46,8 @@ pub enum Tag {
     Unsupported(u32),
 }
 
-impl From<u32> for Tag {
-    fn from(n: u32) -> Tag {
+impl From<u32> for TableTag {
+    fn from(n: u32) -> TableTag {
         const CMAP: u32 = 0x636d6170;
         const HEAD: u32 = 0x68656164;
         const HHEA: u32 = 0x68686561;
@@ -68,62 +65,50 @@ impl From<u32> for Tag {
         const CFF2: u32 = 0x43464632; // "CFF2"
 
         match n {
-            CMAP => Tag::Cmap,
-            HEAD => Tag::Head,
-            HHEA => Tag::HorizontalHeader,
-            HMTX => Tag::HorizontalMetrics,
-            MAXP => Tag::MaximumProfile,
-            NAME => Tag::Names,
-            OS2  => Tag::WindowsSpecific,
-            POST => Tag::Postscript,
-            GLYF => Tag::Glyphs,
-            CFF  => Tag::Cff,
-            CFF2 => Tag::Cff2,
-            _    => Tag::Unsupported(n),
+            CMAP => TableTag::Cmap,
+            HEAD => TableTag::Head,
+            HHEA => TableTag::HorizontalHeader,
+            HMTX => TableTag::HorizontalMetrics,
+            MAXP => TableTag::MaximumProfile,
+            NAME => TableTag::Names,
+            OS2  => TableTag::WindowsSpecific,
+            POST => TableTag::Postscript,
+            GLYF => TableTag::Glyphs,
+            CFF  => TableTag::Cff,
+            CFF2 => TableTag::Cff2,
+            _    => TableTag::Unsupported(n),
         }
     }
 }
 
-impl Parse for Tag {
-    fn size() -> usize { 4 }
-
-    fn parse(buf: &[u8]) -> Result<(&[u8], Self)> {
-        if buf.len() < Self::size() {
-            return Err(Error::UnexpectedEof)
-        }
-
-        let tag = parse::be_u32(buf).into();
-        let buf = &buf[Self::size()..];
-
-        Ok((buf, tag))
-    }
-}
+impl_parse!(be_u32 => TableTag; 4);
 
 #[derive(Debug)]
 struct OffsetTable {
-    tag:       Tag,
+    tag:       TableTag,
     check_sum: u32,
-    //offset:    Offset<'a>,
+    offset:    Offset32,
     length:    u32,
 }
 
 impl Parse for OffsetTable {
-    fn size() -> usize { 16 }
+    fn size() -> usize {
+        TableTag::size() + u32::size() + Offset32::size() + u32::size()
+     }
     fn parse(buf: &[u8]) -> Result<(&[u8], Self)> {
         if buf.len() < Self::size() {
             return Err(Error::UnexpectedEof)
         }
 
-        let (buf, tag) = Tag::parse(buf)?;
+        let (buf, tag) = TableTag::parse(buf)?;
         let (buf, check_sum) = u32::parse(buf)?;
-
-        let buf = &buf[4..]; // skip offset for now
-
+        let (buf, offset) = Offset32::parse(buf)?;
         let (buf, length) = u32::parse(buf)?;
 
         Ok((buf, OffsetTable {
             tag: tag,
             check_sum: check_sum,
+            offset: offset,
             length: length,
         }))
     }
@@ -133,6 +118,8 @@ impl Parse for OffsetTable {
 pub struct Font {
     pub version: Version,
     num_tables:  u16,
+
+    _other: Ignore6,
     // search_range:   u16,
     // entry_selector: u16,
     // range_shift:    u16
@@ -151,12 +138,12 @@ impl Parse for Font {
 
         let (buf, version) = Version::parse(buf)?;
         let (buf, num_tables) = u16::parse(buf)?;
-
-        let buf = &buf[6..]; // Ignore rest
+        let (buf, _) = Ignore6::parse(buf)?;
 
         Ok((buf, Font {
             version: version,
             num_tables: num_tables,
+            _other: Ignore6,
         }))
     }
 }
@@ -175,6 +162,7 @@ mod test {
 
         let file = File::open(r"data/OpenSans-Regular.ttf")
             .expect("Unable to open file");
+
         let mut reader = BufReader::new(file);
         let mut data   = Vec::new();
         reader.read_to_end(&mut data)
@@ -184,10 +172,12 @@ mod test {
             .expect("Unable to parse font");
 
         for _ in 0..font.num_tables {
-            let res   = OffsetTable::parse(data).unwrap();
-            data = res.0;
+            let table = OffsetTable::parse(data).unwrap();
 
-            println!("{:?}", res.1);
+            let res = table.1;
+            data = table.0;
+
+            println!("{:?}", res);
         }
 
         println!("{:?}", font);
