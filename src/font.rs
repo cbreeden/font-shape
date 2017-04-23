@@ -148,6 +148,42 @@ impl Parse for Font {
     }
 }
 
+impl Font {
+    fn table_iter<'a> (&self, buf: &'a [u8]) -> TableIter<'a> {
+            TableIter {
+                buf: buf,
+                pos: 0,
+                max: self.num_tables as usize,
+            }
+    }
+}
+
+struct TableIter<'a> {
+    buf: &'a [u8],
+    pos: usize,
+    max: usize,
+}
+
+impl<'a> Iterator for TableIter<'a> {
+    type Item = Result<OffsetTable>;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        if self.pos >= self.max {
+            return None
+        }
+
+        let next = match OffsetTable::parse(self.buf) {
+            Err(e) => return Some(Err(e)),
+            Ok(n)  => n,
+        };
+
+        self.buf = next.0;
+        self.pos += 1;
+
+        Some(Ok(next.1))
+    }
+}
+
 #[cfg(test)]
 mod test {
     use super::Font;
@@ -168,16 +204,11 @@ mod test {
         reader.read_to_end(&mut data)
             .expect("Error reading file");
 
-        let (mut data, font) = Font::parse(&data)
+        let (data, font) = Font::parse(&data)
             .expect("Unable to parse font");
 
-        for _ in 0..font.num_tables {
-            let table = OffsetTable::parse(data).unwrap();
-
-            let res = table.1;
-            data = table.0;
-
-            println!("{:?}", res);
+        for table in font.table_iter(data) {
+            println!("{:?}", table.unwrap());
         }
 
         println!("{:?}", font);
