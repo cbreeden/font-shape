@@ -1,5 +1,6 @@
 #![allow(dead_code)]
-extern crate byteorder;
+#[macro_use]
+extern crate parse_derive;
 
 #[macro_use]
 mod util;

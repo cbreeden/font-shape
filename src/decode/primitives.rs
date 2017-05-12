@@ -2,6 +2,8 @@ use decode;
 use decode::Parse;
 use decode::{Result, Error};
 
+use std::fmt;
+
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct Fixed(pub f64);
 
@@ -41,18 +43,34 @@ impl From<u16> for UFWord {
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Clone, Copy, PartialEq, Eq)]
 pub struct Tag(pub [u8; 4]);
 
-impl From<u32> for Tag {
-    fn from(n: u32) -> Tag {
-        let tag = [
-            (n >> 24) as u8,
-            (n >> 16) as u8,
-            (n >> 8)  as u8,
-             n        as u8 ];
+impl From<[u8; 4]> for Tag {
+    fn from(b: [u8; 4]) -> Tag {
+        Tag(b)
+    }
+}
 
-        Tag(tag)
+impl fmt::Debug for Tag {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        use ::std::str;
+        match str::from_utf8(&self.0[..]) {
+            Ok(s) => f.debug_tuple("Tag")
+                .field(&s)
+                .finish(),
+            Err(_) => {
+                // Print in Hex if not ascii
+                let n = (self.0[3] as u32) << 24
+                    | (self.0[2] as u32) << 16
+                    | (self.0[1] as u32) << 8
+                    | (self.0[0] as u32);
+
+                f.debug_tuple("Tag")
+                    .field(&format!("{:X}", n))
+                    .finish()
+            }
+        }
     }
 }
 
@@ -74,12 +92,13 @@ impl From<u32> for Offset32 {
     }
 }
 
+impl_parse!(be_u8_4 => Tag; 4);
+
 impl_parse!(
     be_i32 => Fixed;    4,
     be_i16 => F2Dot14;  2,
     be_i16 => FWord;    2,
     be_u16 => UFWord;   2,
-    be_u32 => Tag;      4,
     be_u8  => u8;       1,
     be_i8  => i8;       1,
     be_u16 => u16;      2,
@@ -107,9 +126,9 @@ macro_rules! impl_ignore {
     ($($size:expr => $name:ident),*) => (
         $(
             impl Parse for $name {
-                fn size() -> usize { $size }
+                fn static_size() -> usize { $size }
                 fn parse(buf: &[u8]) -> Result<(&[u8], Self)> {
-                    if buf.len() < Self::size() {
+                    if buf.len() < Self::static_size() {
                         return Err(Error::UnexpectedEof)
                     }
 
