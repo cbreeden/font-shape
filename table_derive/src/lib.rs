@@ -59,7 +59,7 @@ fn impl_parse(ast: &syn::DeriveInput) -> quote::Tokens {
                 let _buf = buf;
                 #(#parse)*
 
-                Ok((buf, #ident {
+                Ok((_buf, #ident {
                     #(#build),*
                 }))
             }

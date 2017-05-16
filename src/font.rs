@@ -65,11 +65,12 @@ impl<'f> Font<'f> {
     }
 
     fn tables(&self) -> TableIter {
-            TableIter {
-                buf: self.buf,
-                pos: 0,
-                max: self.num_tables as usize,
-            }
+        let shift = OffsetTable::static_size();
+        TableIter {
+            buf: &self.buf[shift..],
+            pos: 0,
+            max: self.num_tables as usize,
+        }
     }
 }
 
@@ -99,41 +100,33 @@ impl<'a> Iterator for TableIter<'a> {
     }
 }
 
-// #[cfg(test)]
-// mod test {
-//     use super::Font;
-//     use super::Table;
-//     use super::hhea;
-//     use ::decode::primitives::Tag;
+#[cfg(test)]
+mod test {
+    use super::Font;
+    use super::Table;
+    use super::hhea;
+    use ::decode::primitives::Tag;
 
-//     #[test]
-//     fn print_tables() {
-//         use std::fs::File;
-//         use std::io::BufReader;
-//         use std::io::prelude::*;
+    #[test]
+    fn print_tables() {
+        use std::fs::File;
+        use std::io::BufReader;
+        use std::io::prelude::*;
 
-//         let file = File::open(r"data/OpenSans-Regular.ttf")
-//             .expect("Unable to open file");
+        let file = File::open(r"data/OpenSans-Regular.ttf")
+            .expect("Unable to open file");
 
-//         let mut reader = BufReader::new(file);
-//         let mut data   = Vec::new();
-//         reader.read_to_end(&mut data)
-//             .expect("Error reading file");
+        let mut reader = BufReader::new(file);
+        let mut data   = Vec::new();
+        reader.read_to_end(&mut data)
+            .expect("Error reading file");
 
-//         let (offset, font) = Font::parse(&data)
-//             .expect("Unable to parse font");
+        let font = Font::from_buffer(&data)
+            .expect("Unable to parse font");
 
-//         for table in font.table_iter() {
-//             println!("{:?}", table.unwrap());
-//         }
-
-//         let offset = font.get_table_offset(Tag(*b"hhea"), &offset)
-//             .expect("unable to find hhea table!");
-
-//         let hhea_buf = &data[offset as usize..];
-//         let (_, hhea) = hhea::Hhea::parse(hhea_buf).unwrap();
-//         println!("{:?}", hhea);
-
-//         println!("{:?}", font);
-//     }
-// }
+        for tbl in font.tables() {
+            let tbl = tbl.unwrap();
+            println!("{:?}", tbl);
+        }
+    }
+}
