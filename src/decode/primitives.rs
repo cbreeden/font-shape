@@ -1,8 +1,10 @@
 use decode;
-use decode::Parse;
+use decode::Table;
+use decode::StaticSize;
 use decode::{Result, Error};
 
 use std::fmt;
+use std::marker::PhantomData;
 
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct Fixed(pub f64);
@@ -55,21 +57,22 @@ impl From<[u8; 4]> for Tag {
 impl fmt::Debug for Tag {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         use ::std::str;
-        match str::from_utf8(&self.0[..]) {
-            Ok(s) => f.debug_tuple("Tag")
+        // Print the ASCII name if the name contains only
+        // visible ASCII characters.  Otherwise Hex.
+        if self.0.iter().all(|&c| c >= 32 && c <= 128) {
+            let s = str::from_utf8(&self.0[..]).unwrap();
+            f.debug_tuple("Tag")
                 .field(&s)
-                .finish(),
-            Err(_) => {
-                // Print in Hex if not ascii
-                let n = (self.0[3] as u32) << 24
-                    | (self.0[2] as u32) << 16
-                    | (self.0[1] as u32) << 8
-                    | (self.0[0] as u32);
+                .finish()
+        } else {
+            let n = (self.0[3] as u32) << 24
+                | (self.0[2] as u32) << 16
+                | (self.0[1] as u32) << 8
+                | (self.0[0] as u32);
 
-                f.debug_tuple("Tag")
-                    .field(&format!("{:X}", n))
-                    .finish()
-            }
+            f.debug_tuple("Tag")
+                .field(&format!("0x{:X}", n))
+                .finish()
         }
     }
 }
@@ -84,7 +87,7 @@ impl From<u16> for Offset16 {
 }
 
 #[derive(Debug, Clone, Copy)]
-pub struct Offset32(u32);
+pub struct Offset32(pub u32);
 
 impl From<u32> for Offset32 {
     fn from(n: u32) -> Offset32 {
@@ -109,41 +112,17 @@ impl_parse!(
     be_u32 => Offset32; 4
 );
 
-#[derive(Debug)]
-pub struct Ignore1;
-#[derive(Debug)]
-pub struct Ignore2;
-#[derive(Debug)]
-pub struct Ignore4;
-#[derive(Debug)]
-pub struct Ignore6;
-#[derive(Debug)]
-pub struct Ignore8;
-#[derive(Debug)]
-pub struct Ignore16;
-
-macro_rules! impl_ignore {
-    ($($size:expr => $name:ident),*) => (
-        $(
-            impl Parse for $name {
-                fn static_size() -> usize { $size }
-                fn parse(buf: &[u8]) -> Result<(&[u8], Self)> {
-                    if buf.len() < Self::static_size() {
-                        return Err(Error::UnexpectedEof)
-                    }
-
-                    Ok(( &buf[$size..], $name ))
-                }
-            }
-        )*
-    )
+#[derive(Debug, Copy, Clone, Hash, PartialEq, Eq, PartialOrd, Ord)]
+pub struct Reserved<T> {
+    _phantom: PhantomData<T>,
 }
 
-impl_ignore!(
-    1 => Ignore1,
-    2 => Ignore2,
-    4 => Ignore4,
-    6 => Ignore6,
-    8 => Ignore8,
-    16 => Ignore16
-);
+impl<T> StaticSize for Reserved<T> where T: StaticSize {
+    fn static_size() -> usize { T::static_size() }
+}
+
+impl<T> Table for Reserved<T> where T: StaticSize {
+    fn parse(buf: &[u8]) -> Result<(&[u8], Self)> {
+        Ok((buf, Reserved { _phantom: PhantomData }))
+    }
+}

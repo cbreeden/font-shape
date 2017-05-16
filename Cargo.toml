@@ -4,4 +4,4 @@ name = "playground_library"
 version = "0.1.0"
 
 [dependencies]
-parse_derive = { path = "parse_derive/" }
+table_derive = { path = "table_derive/" }

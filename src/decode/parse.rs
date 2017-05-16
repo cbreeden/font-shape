@@ -9,9 +9,11 @@ pub enum Error {
 
 pub type Result<T> = result::Result<T, Error>;
 
-pub trait Parse
-    where Self: Sized {
+pub trait StaticSize {
     fn static_size() -> usize;
+}
+
+pub trait Table: StaticSize + Sized {
     fn parse(&[u8]) -> Result<(&[u8], Self)>;
 }
 

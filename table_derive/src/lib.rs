@@ -5,7 +5,7 @@ extern crate quote;
 
 use proc_macro::TokenStream;
 
-#[proc_macro_derive(Parse)]
+#[proc_macro_derive(Table)]
 pub fn parse(input: TokenStream) -> TokenStream {
     let source = input.to_string();
     let ast = syn::parse_derive_input(&source)
@@ -23,15 +23,19 @@ fn impl_parse(ast: &syn::DeriveInput) -> quote::Tokens {
         _ => panic!("#[derive(Parse)] is only defined for braced structs"),
     };
 
+    let (impl_generics, ty_generics, where_clause) = ast.generics.split_for_impl();
     let ident = &ast.ident;
-    let idents = variants.iter().map(|field| &field.ty);
+    let idents = variants.iter()
+        .filter(|field| field.ident.as_ref().unwrap() != "buf")
+        .map(|field| &field.ty);
     let parse = variants.iter()
+        .filter(|field| field.ident.as_ref().unwrap() != "buf")
         .map(|field| {
             let ident = field.ident.as_ref().unwrap();
             let ty = &field.ty;
 
             quote! {
-                let (buf, #ident ) = #ty ::parse(buf)?;
+                let (_buf, #ident ) = <#ty> ::parse(_buf)?;
             }
         });
     let build = variants
@@ -40,16 +44,19 @@ fn impl_parse(ast: &syn::DeriveInput) -> quote::Tokens {
         .map(|id| quote! { #id : #id });
 
     quote! {
-        impl Parse for #ident {
+        impl #impl_generics StaticSize for #ident #ty_generics #where_clause {
             fn static_size() -> usize {
-                #(#idents ::static_size())+*
+                #(<#idents>::static_size())+*
             }
+        }
 
+        impl #impl_generics Table for #ident #ty_generics #where_clause {
             fn parse(buf: &[u8]) -> Result<(&[u8], Self)> {
                 if buf.len() < Self::static_size() {
                     return Err(Error::UnexpectedEof)
                 }
 
+                let _buf = buf;
                 #(#parse)*
 
                 Ok((buf, #ident {

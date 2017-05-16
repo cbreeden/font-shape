@@ -1,6 +1,9 @@
-use decode::primitives::{Tag, Offset32, Ignore6};
-use decode::Parse;
+use decode::primitives::{Tag, Offset32, Reserved};
+use decode::Table;
+use decode::StaticSize;
 use decode::{Error, Result};
+
+use hhea;
 
 #[derive(Debug)]
 pub enum Version {
@@ -8,8 +11,9 @@ pub enum Version {
     TrueType,
 }
 
-impl Parse for Version {
-    fn static_size() -> usize { 4 }
+static_size!(Version = 4);
+
+impl Table for Version {
     fn parse(buf: &[u8]) -> Result<(&[u8], Version)> {
         const VERSION1: [u8; 4] = [0x00, 0x01, 0x00, 0x00];
 
@@ -29,7 +33,7 @@ impl Parse for Version {
     }
 }
 
-#[derive(Debug, Parse)]
+#[derive(Debug, Table)]
 struct OffsetTable {
     tag:       Tag,
     check_sum: u32,
@@ -37,69 +41,36 @@ struct OffsetTable {
     length:    u32,
 }
 
-// impl Parse for OffsetTable {
-//     fn static_size() -> usize {
-//         Tag::static_size() + u32::static_size() + Offset32::static_size() + u32::static_size()
-//      }
-//     fn parse(buf: &[u8]) -> Result<(&[u8], Self)> {
-//         if buf.len() < Self::static_size() {
-//             return Err(Error::UnexpectedEof)
-//         }
-
-//         let (buf, tag) = Tag::parse(buf)?;
-//         let (buf, check_sum) = u32::parse(buf)?;
-//         let (buf, offset) = Offset32::parse(buf)?;
-//         let (buf, length) = u32::parse(buf)?;
-
-//         Ok((buf, OffsetTable {
-//             tag: tag,
-//             check_sum: check_sum,
-//             offset: offset,
-//             length: length,
-//         }))
-//     }
-// }
-
-#[derive(Debug)]
-struct Font {
+#[derive(Debug, Table)]
+struct Font<'a> {
+    buf: &'a [u8],
     version: Version,
     num_tables: u16,
-    _other: Ignore6,
+    search_range: Reserved<u16>,
+    entry_selector: Reserved<u16>,
+    range_shirt: Reserved<u16>,
     // search_range:   u16,
     // entry_selector: u16,
     // range_shift:    u16
 }
 
-impl Parse for Font {
-    #[inline]
-    fn static_size() -> usize {
-        12
-    }
-
-    fn parse(buf: &[u8]) -> Result<(&[u8], Self)> {
-        if buf.len() < Self::static_size() {
-            return Err(Error::UnexpectedEof)
-        }
-
-        let (buf, version) = Version::parse(buf)?;
-        let (buf, num_tables) = u16::parse(buf)?;
-        let (buf, _) = Ignore6::parse(buf)?;
-
-        Ok((buf, Font {
-            version: version,
-            num_tables: num_tables,
-            _other: Ignore6,
-        }))
-    }
-}
-
-impl Font {
-    fn table_iter<'a> (&self, buf: &'a [u8]) -> TableIter<'a> {
+impl<'a> Font<'a> {
+    fn table_iter<'b> (&'b self) -> TableIter<'b> {
             TableIter {
-                buf: buf,
+                buf: self.buf,
                 pos: 0,
                 max: self.num_tables as usize,
             }
+    }
+
+    fn get_table_offset(&self, tag: Tag, buf: &[u8]) -> Option<u32> {
+        for table in self.table_iter() {
+            let tbl = table.unwrap();
+            if tbl.tag == tag {
+                return Some(tbl.offset.0)
+            }
+        }
+        None
     }
 }
 
@@ -132,8 +103,9 @@ impl<'a> Iterator for TableIter<'a> {
 #[cfg(test)]
 mod test {
     use super::Font;
-    use super::Parse;
-    use super::OffsetTable;
+    use super::Table;
+    use super::hhea;
+    use ::decode::primitives::Tag;
 
     #[test]
     fn print_tables() {
@@ -149,12 +121,19 @@ mod test {
         reader.read_to_end(&mut data)
             .expect("Error reading file");
 
-        let (data, font) = Font::parse(&data)
+        let (offset, font) = Font::parse(&data)
             .expect("Unable to parse font");
 
-        for table in font.table_iter(data) {
+        for table in font.table_iter() {
             println!("{:?}", table.unwrap());
         }
+
+        let offset = font.get_table_offset(Tag(*b"hhea"), &offset)
+            .expect("unable to find hhea table!");
+
+        let hhea_buf = &data[offset as usize..];
+        let (_, hhea) = hhea::Hhea::parse(hhea_buf).unwrap();
+        println!("{:?}", hhea);
 
         println!("{:?}", font);
     }

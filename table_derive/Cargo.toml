@@ -1,6 +1,6 @@
 [package]
 authors = ["cbreeden <github@u.breeden.cc>"]
-name = "parse_derive"
+name = "table_derive"
 version = "0.1.0"
 
 [dependencies]
