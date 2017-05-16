@@ -1,4 +1,4 @@
-use decode::primitives::{Tag, Offset32, Reserved};
+use decode::primitives::Tag;
 use decode::Table;
 use decode::StaticSize;
 use decode::{Error, Result};
@@ -38,7 +38,7 @@ struct OffsetTable {
 struct TableRecord {
     tag:       Tag,
     check_sum: u32,
-    offset:    Offset32,
+    offset:    u32,
     length:    u32,
 }
 
@@ -103,8 +103,6 @@ impl<'a> Iterator for TableIter<'a> {
 #[cfg(test)]
 mod test {
     use super::Font;
-    use super::Table;
-    use super::hhea;
     use ::decode::primitives::Tag;
 
     #[test]
@@ -125,8 +123,13 @@ mod test {
             .expect("Unable to parse font");
 
         for tbl in font.tables() {
-            let tbl = tbl.unwrap();
-            println!("{:?}", tbl);
+            println!("{:?}", tbl.unwrap());
         }
+    }
+
+    #[test]
+    fn test_tag() {
+        let t = Tag([0x00,0x01,0x00,0x00]);
+        println!("{:?}", t);
     }
 }

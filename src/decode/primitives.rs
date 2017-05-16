@@ -65,13 +65,14 @@ impl fmt::Debug for Tag {
                 .field(&s)
                 .finish()
         } else {
-            let n = (self.0[3] as u32) << 24
-                | (self.0[2] as u32) << 16
-                | (self.0[1] as u32) << 8
-                | (self.0[0] as u32);
+            let n = (self.0[0] as u32) << 24
+                | (self.0[1] as u32) << 16
+                | (self.0[2] as u32) << 8
+                | (self.0[3] as u32);
 
+            //TODO: This shouldn't look like a string
             f.debug_tuple("Tag")
-                .field(&format!("0x{:X}", n))
+                .field(&format!("0x{:08X}", n))
                 .finish()
         }
     }
