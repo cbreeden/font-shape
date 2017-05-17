@@ -3,14 +3,11 @@ use decode::Table;
 use decode::StaticSize;
 use decode::{Error, Result};
 
-use hhea;
-
 #[derive(Debug)]
 pub enum Version {
     OpenType,
     TrueType,
 }
-
 
 static_size!(Version = 4);
 versioned_table!(Version,
@@ -35,22 +32,22 @@ struct OffsetTable {
 }
 
 #[derive(Table, Debug)]
-struct TableRecord {
-    tag:       Tag,
-    check_sum: u32,
-    offset:    u32,
-    length:    u32,
+pub struct TableRecord {
+    pub tag:       Tag,
+    pub check_sum: u32,
+    pub offset:    u32,
+    pub length:    u32,
 }
 
 #[derive(Debug)]
-struct Font<'a> {
+pub struct Font<'a> {
     buf: &'a [u8],
     version: Version,
     num_tables: u16,
 }
 
 impl<'f> Font<'f> {
-    fn from_buffer<'b: 'f>(buf: &'b [u8]) -> Result<Font<'f>> {
+    pub fn from_buffer<'b: 'f>(buf: &'b [u8]) -> Result<Font<'f>> {
         if buf.len() < OffsetTable::static_size() {
             return Err(Error::InvalidData)
         }
@@ -64,7 +61,7 @@ impl<'f> Font<'f> {
         })
     }
 
-    fn tables(&self) -> TableIter {
+    pub fn tables(&self) -> TableIter {
         let shift = OffsetTable::static_size();
         TableIter {
             buf: &self.buf[shift..],
@@ -74,7 +71,7 @@ impl<'f> Font<'f> {
     }
 }
 
-struct TableIter<'a> {
+pub struct TableIter<'a> {
     buf: &'a [u8],
     pos: usize,
     max: usize,

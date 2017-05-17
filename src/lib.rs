@@ -6,4 +6,4 @@ extern crate table_derive;
 mod util;
 mod font;
 mod decode;
-mod hhea;
+mod table;

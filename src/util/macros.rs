@@ -38,42 +38,27 @@ macro_rules! versioned_table {
                 }
 
                 let (buf, $arg) = <$i>::parse(buf)?;
-                let res = $body;
+                Ok((buf, $body))
+            }
+        }
+    };
 
-                Ok((buf, res))
+    ($name:ty, $i:ty => |$buf: pat, $arg:pat| $body:block) => {
+        impl Table for $name {
+            fn parse(buf: &[u8]) -> Result<(&[u8], $name)> {
+                if buf.len() < Self::static_size() {
+                    return Err(Error::UnexpectedEof)
+                }
+
+                let ($buf, $arg) = <$i>::parse(buf)?;
+                Ok($body)
             }
         }
     }
 }
 
-// versioned_table!(Version,
-//     Tag => |tag| {
-//         const VERSION1: &[u8; 4] = &[0x00, 0x01, 0x00, 0x00];
-//         match &tag.0 {
-//             b"OTTO" => Version::OpenType,
-//             VERSION1 | b"true" | b"typ1" => Version::TrueType,
-//             b"ttcf" => return Err(Error::TtcfUnsupported),
-//             _ => return Err(Error::InvalidData),
-//         }
-//     }
-// );
-
-// impl Table for Version {
-//     fn parse(buf: &[u8]) -> Result<(&[u8], Version)> {
-//         const VERSION1: &[u8; 4] = &[0x00, 0x01, 0x00, 0x00];
-
-//         if buf.len() < Self::static_size() {
-//             return Err(Error::UnexpectedEof)
-//         }
-
-//         let (buf, tag) = Tag::parse(buf)?;
-//         let ver = match &tag.0 {
-//             b"OTTO" => Version::OpenType,
-//             VERSION1 | b"true" | b"typ1" => Version::TrueType,
-//             b"ttcf" => return Err(Error::TtcfUnsupported),
-//             _ => return Err(Error::InvalidData),
-//         };
-
-//         Ok((buf, ver))
-//     }
-// }
+macro_rules! tag {
+    ($a:expr, $b:expr, $c:expr, $d:expr) => {
+        ::decode::primitives::Tag([$a as u8, $b as u8, $c as u8, $d as u8])
+    }
+}
