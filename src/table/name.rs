@@ -142,20 +142,18 @@ mod test {
         use std::io::prelude::*;
 
         let file = File::open(r"data/OpenSans-Regular.ttf")
-            .expect("Unable to open file");
+            .expect("unable to open file");
 
         let mut reader = BufReader::new(file);
         let mut data   = Vec::new();
         reader.read_to_end(&mut data)
-            .expect("Error reading file");
+            .expect("error reading font");
 
         let font = Font::from_buffer(&data)
-            .expect("Unable to parse font");
+            .expect("unable to parse font");
 
-        let TableRecord { offset, .. } = font.tables()
-            .map(|tr| tr.unwrap())
-            .find(|tr| tr.tag == tag!('n','a','m','e'))
-            .unwrap();
+        let offset = font.get_table_offset(Tag(*b"name"))
+            .expect("unable to find 'name' table");
 
         let name_buf = &data[offset as usize..];
         let (_, tbl) = Name::parse(name_buf).unwrap();

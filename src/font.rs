@@ -61,12 +61,35 @@ impl<'f> Font<'f> {
         })
     }
 
-    pub fn tables(&self) -> TableIter {
+    pub fn tables(&self) -> Result<TableIter> {
         let shift = OffsetTable::static_size();
-        TableIter {
+        let required_size = shift
+            + TableRecord::static_size() * self.num_tables as usize;
+
+        if self.buf.len() < required_size {
+            return Err(Error::InvalidData)
+        }
+
+        Ok(TableIter {
             buf: &self.buf[shift..],
             pos: 0,
             max: self.num_tables as usize,
+        })
+    }
+
+    pub fn get_table_record(&self, tag: Tag) -> Option<TableRecord> {
+        let mut tables = match self.tables() {
+            Err(_) => return None,
+            Ok(tables) => tables,
+        };
+
+        tables.find(|tbl| tbl.tag == tag)
+    }
+
+    pub fn get_table_offset(&self, tag: Tag) -> Option<usize> {
+        match self.get_table_record(tag) {
+            None => None,
+            Some(table) => Some(table.offset as usize),
         }
     }
 }
@@ -78,55 +101,53 @@ pub struct TableIter<'a> {
 }
 
 impl<'a> Iterator for TableIter<'a> {
-    type Item = Result<TableRecord>;
+    type Item = TableRecord;
 
     fn next(&mut self) -> Option<Self::Item> {
         if self.pos >= self.max {
             return None
         }
 
-        let next = match TableRecord::parse(self.buf) {
-            Err(e) => return Some(Err(e)),
-            Ok(n)  => n,
-        };
-
+        // The only possible failure is EOF, which is checked
+        // for while constructing TableIter.
+        let next = TableRecord::parse(self.buf).unwrap();
         self.buf = next.0;
         self.pos += 1;
 
-        Some(Ok(next.1))
+        Some(next.1)
     }
 }
 
-#[cfg(test)]
-mod test {
-    use super::Font;
-    use ::decode::primitives::Tag;
+// #[cfg(test)]
+// mod test {
+//     use super::Font;
+//     use ::decode::primitives::Tag;
 
-    #[test]
-    fn print_tables() {
-        use std::fs::File;
-        use std::io::BufReader;
-        use std::io::prelude::*;
+//     #[test]
+//     fn print_tables() {
+//         use std::fs::File;
+//         use std::io::BufReader;
+//         use std::io::prelude::*;
 
-        let file = File::open(r"data/OpenSans-Regular.ttf")
-            .expect("Unable to open file");
+//         let file = File::open(r"data/OpenSans-Regular.ttf")
+//             .expect("Unable to open file");
 
-        let mut reader = BufReader::new(file);
-        let mut data   = Vec::new();
-        reader.read_to_end(&mut data)
-            .expect("Error reading file");
+//         let mut reader = BufReader::new(file);
+//         let mut data   = Vec::new();
+//         reader.read_to_end(&mut data)
+//             .expect("Error reading file");
 
-        let font = Font::from_buffer(&data)
-            .expect("Unable to parse font");
+//         let font = Font::from_buffer(&data)
+//             .expect("Unable to parse font");
 
-        for tbl in font.tables() {
-            println!("{:?}", tbl.unwrap());
-        }
-    }
+//         for tbl in font.tables() {
+//             println!("{:?}", tbl.unwrap());
+//         }
+//     }
 
-    #[test]
-    fn test_tag() {
-        let t = Tag([0x00,0x01,0x00,0x00]);
-        println!("{:?}", t);
-    }
-}
+//     #[test]
+//     fn test_tag() {
+//         let t = Tag([0x00,0x01,0x00,0x00]);
+//         println!("{:?}", t);
+//     }
+// }
