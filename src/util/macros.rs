@@ -62,3 +62,23 @@ macro_rules! tag {
         ::decode::primitives::Tag([$a as u8, $b as u8, $c as u8, $d as u8])
     }
 }
+
+//
+// Test related Macros
+//
+
+macro_rules! open_font {
+    ($name:expr) => ({
+        use std::fs::File;
+        use std::io::BufReader;
+        use std::io::prelude::*;
+
+        let file = File::open(r"data/OpenSans-Regular.ttf").expect("unable to open file");
+
+        let mut reader = BufReader::new(file);
+        let mut data = Vec::new();
+        reader.read_to_end(&mut data).expect("error reading font");
+
+        Font::from_buffer(&data).expect("unable to parse font")        
+    })
+}

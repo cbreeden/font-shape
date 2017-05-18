@@ -3,6 +3,8 @@ use decode::Table;
 use decode::StaticSize;
 use decode::{Error, Result};
 
+use table::name::Name;
+
 #[derive(Debug)]
 pub enum Version {
     OpenType,
@@ -33,10 +35,10 @@ struct OffsetTable {
 
 #[derive(Table, Debug)]
 pub struct TableRecord {
-    pub tag:       Tag,
+    pub tag: Tag,
     pub check_sum: u32,
-    pub offset:    u32,
-    pub length:    u32,
+    pub offset: u32,
+    pub length: u32,
 }
 
 #[derive(Debug)]
@@ -49,32 +51,31 @@ pub struct Font<'a> {
 impl<'f> Font<'f> {
     pub fn from_buffer<'b: 'f>(buf: &'b [u8]) -> Result<Font<'f>> {
         if buf.len() < OffsetTable::static_size() {
-            return Err(Error::InvalidData)
+            return Err(Error::InvalidData);
         }
 
         let (_, offset_table) = OffsetTable::parse(buf)?;
 
         Ok(Font {
-            buf: buf,
-            num_tables: offset_table.num_tables,
-            version: offset_table.sfnt_version,
-        })
+               buf: buf,
+               num_tables: offset_table.num_tables,
+               version: offset_table.sfnt_version,
+           })
     }
 
     pub fn tables(&self) -> Result<TableIter> {
         let shift = OffsetTable::static_size();
-        let required_size = shift
-            + TableRecord::static_size() * self.num_tables as usize;
+        let required_size = shift + TableRecord::static_size() * self.num_tables as usize;
 
         if self.buf.len() < required_size {
-            return Err(Error::InvalidData)
+            return Err(Error::InvalidData);
         }
 
         Ok(TableIter {
-            buf: &self.buf[shift..],
-            pos: 0,
-            max: self.num_tables as usize,
-        })
+               buf: &self.buf[shift..],
+               pos: 0,
+               max: self.num_tables as usize,
+           })
     }
 
     pub fn get_table_record(&self, tag: Tag) -> Option<TableRecord> {
@@ -92,6 +93,16 @@ impl<'f> Font<'f> {
             Some(table) => Some(table.offset as usize),
         }
     }
+
+    pub fn get_name_table(&self) -> Result<Name> {
+        // Get the name table.
+        let offset = self.get_table_offset(Tag(*b"name"))
+            .ok_or(Error::InvalidData)?;
+
+        let name_buf = &self.buf[offset as usize..];
+        let (_, tbl) = Name::parse(name_buf)?;
+        Ok(tbl)
+    }
 }
 
 pub struct TableIter<'a> {
@@ -105,7 +116,7 @@ impl<'a> Iterator for TableIter<'a> {
 
     fn next(&mut self) -> Option<Self::Item> {
         if self.pos >= self.max {
-            return None
+            return None;
         }
 
         // The only possible failure is EOF, which is checked

@@ -1,6 +1,6 @@
 [package]
 authors = ["cbreeden <github@u.breeden.cc>"]
-name = "playground_library"
+name = "font_shape"
 version = "0.1.0"
 
 [dependencies]
