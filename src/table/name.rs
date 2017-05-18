@@ -97,6 +97,35 @@ pub enum NameId {
     VariationsPostScriptNamePrefix = 25,
 }
 
+// Derived from http://www.unicode.org/Public/MAPPINGS/VENDORS/APPLE/ROMAN.TXT
+static MAC_ROMAN: [char; 128] = [
+    'Ä', 'Å', 'Ç', 'É', 'Ñ', 'Ö', 'Ü', 'á', 'à', 'â',
+    'ä', 'ã', 'å', 'ç', 'é', 'è', 'ê', 'ë', 'í', 'ì',
+    'î', 'ï', 'ñ', 'ó', 'ò', 'ô', 'ö', 'õ', 'ú', 'ù',
+    'û', 'ü', '†', '°', '¢', '£', '§', '•', '¶', 'ß',
+    '®', '©', '™', '´', '¨', '≠', 'Æ', 'Ø', '∞', '±',
+    '≤', '≥', '¥', 'µ', '∂', '∑', '∏', 'π', '∫', 'ª',
+    'º', 'Ω', 'æ', 'ø', '¿', '¡', '¬', '√', 'ƒ', '≈',
+    '∆', '«', '»', '…', ' ', 'À', 'Ã', 'Õ', 'Œ', 'œ',
+    '–', '—', '“', '”', '‘', '’', '÷', '◊', 'ÿ', 'Ÿ',
+    '⁄', '€', '‹', '›', 'ﬁ', 'ﬂ', '‡', '·', '‚', '„',
+    '‰', 'Â', 'Ê', 'Á', 'Ë', 'È', 'Í', 'Î', 'Ï', 'Ì',
+    'Ó', 'Ô', '', 'Ò', 'Ú', 'Û', 'Ù', 'ı', 'ˆ', '˜',
+    '¯', '˘', '˙', '˚', '¸', '˝', '˛', 'ˇ'
+];
+
+fn decode_mac_roman(buf: &[u8]) -> String {
+    buf.iter()
+        .map(|&c| {
+            if c <= 128 {
+                c as char
+            } else {
+                MAC_ROMAN[c as usize - 128]
+            }
+        })
+        .collect::<String>()
+}
+
 #[cfg(test)]
 mod test {
     use ::font::Font;
@@ -104,6 +133,7 @@ mod test {
     use ::decode::primitives::Tag;
     use ::table::name::Name;
     use ::decode::Table;
+    use super::decode_mac_roman;
 
     #[test]
     fn print_names() {
@@ -134,12 +164,16 @@ mod test {
 
         for name in tbl.names(name_buf).unwrap() {
             println!("{:?}", name);
-            let start = name.offset as usize;
+
+            let start = tbl.offset as usize
+                + name.offset as usize;
             let end = start + name.length as usize;
             let s = &name_buf[start..end];
 
-            let s = String::from_utf8_lossy(s);
-            println!("Name: {}", s);
+            if name.platform_id == 1 && name.encoding_id == 0 {
+                let s = decode_mac_roman(s);
+                println!("Name: {}", s);
+            };
         }
     }
 }
