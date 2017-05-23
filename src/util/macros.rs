@@ -73,12 +73,12 @@ macro_rules! open_font {
         use std::io::BufReader;
         use std::io::prelude::*;
 
-        let file = File::open(r"data/OpenSans-Regular.ttf").expect("unable to open file");
+        let file = File::open($name).expect("unable to open file");
 
         let mut reader = BufReader::new(file);
         let mut data = Vec::new();
         reader.read_to_end(&mut data).expect("error reading font");
 
-        Font::from_buffer(&data).expect("unable to parse font")        
+        data
     })
 }
