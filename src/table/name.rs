@@ -28,6 +28,14 @@ use decode::{Error, Result};
 
 // For historical reasons, it is strongly recommended that
 // the name table of all fonts include the Maciontosh platform
+
+// offsets! {
+//     Format: u16,
+//     Count: u16,
+//     Offset: u16,
+//     NameRecords: u16,
+// }
+
 #[derive(Debug, Table)]
 pub struct Name {
     pub format: u16,

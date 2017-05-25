@@ -63,6 +63,58 @@ macro_rules! tag {
     }
 }
 
+macro_rules! _offset {
+    (NUL) => { 0 };
+
+    (u8)  => { 1 };
+    (u16) => { 2 };
+    (u32) => { 4 };
+    (u64) => { 8 };
+
+    (i8)  => { 1 };
+    (i16) => { 2 };
+    (i32) => { 4 };
+    (i64) => { 8 };
+
+    (Panose) => { 10 };
+    (Tag)    => { 4 };
+}
+
+macro_rules! offsets {
+    (@item $pname:tt $pty:tt $name:tt: $ty:tt,) => {
+        pub const $name: usize = $pname + _offset!($pty);
+    };
+
+    (@item $pname:tt $pty:tt $name:tt: $ty:tt, $($tail:tt)*) => {
+        pub const $name: usize = $pname + _offset!($pty);
+        offsets!(@item $name $ty $($tail)*);
+    };
+
+    (@group $name:tt $($tail:tt)*) => {
+        pub mod $name {
+            offsets!(@item 0 NUL $($tail)*);
+        }
+    };
+
+    // Match for multiple namespaces
+    ($($name:ident { $($body:tt)* },)* $(,)*) => {
+        mod offsets {
+            #![allow(non_upper_case_globals)]
+            #![allow(dead_code)]
+            $( offsets!(@group $name $($body)*); )*
+        }
+    };
+
+    // Otherwise match for a single namespace
+    ($($tail:tt)*) => {
+        mod offsets {
+            #![allow(non_upper_case_globals)]
+            #![allow(dead_code)]
+            offsets!(@item 0 NUL $($tail)*);
+        }
+    }
+}
+
 //
 // Test related Macros
 //

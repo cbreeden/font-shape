@@ -5,3 +5,4 @@ version = "0.1.0"
 
 [dependencies]
 table_derive = { path = "table_derive/" }
+byteorder = "*"
