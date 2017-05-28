@@ -1,6 +1,7 @@
 use decode::{Error, Result, SizedTable, Table, Primitive, ReadPrimitive, ReadTable};
 use decode::primitives::{Tag, Ignored};
 
+use table::TaggedTable;
 use table::name::Name;
 
 #[derive(Debug)]
@@ -10,15 +11,16 @@ pub enum Version {
 }
 
 impl Primitive for Version {
-    fn size() -> usize { Tag::size() }
+    fn size() -> usize {
+        Tag::size()
+    }
     fn parse(buffer: &[u8]) -> Result<Version> {
         const VERSION1: [u8; 4] = [0x00, 0x01, 0x00, 0x00];
         let tag = Tag::parse(buffer)?;
         match &tag.0 {
             b"OTTO" => Ok(Version::OpenType),
 
-            &VERSION1 | b"true" | b"typ1"
-                => Ok(Version::TrueType),
+            &VERSION1 | b"true" | b"typ1" => Ok(Version::TrueType),
 
             b"ttcf" => Err(Error::TtcfUnsupported),
             _ => Err(Error::InvalidData),
@@ -93,6 +95,20 @@ impl<'f> Font<'f> {
         match self.get_table_record(tag) {
             None => None,
             Some(table) => Some(table.offset as usize),
+        }
+    }
+
+    pub fn get_table<'tbl, T: TaggedTable<'tbl>>(&'tbl self) -> Option<T> {
+        let offset = match self.get_table_offset(T::tag()) {
+            Some(offset) => offset,
+            None => return None,
+        };
+
+        let buf = &self.buf[offset..];
+
+        match T::parse(buf) {
+            Ok(tbl) => Some(tbl),
+            Err(_) => None,
         }
     }
 

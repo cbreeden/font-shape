@@ -27,15 +27,9 @@ use decode::{Error, Result, SizedTable, Table, Primitive, ReadPrimitive, ReadTab
 // For historical reasons, it is strongly recommended that
 // the name table of all fonts include the Maciontosh platform
 
-// offsets! {
-//     Format: u16,
-//     Count: u16,
-//     Offset: u16,
-//     NameRecords: u16,
-// }
-
 #[derive(Debug, Table)]
-pub struct Name {
+pub struct Name<'tbl> {
+    buffer: &'tbl [u8],
     pub format: u16,
     pub count: u16,
     pub offset: u16,
@@ -54,8 +48,8 @@ pub struct NameRecord {
 macro_rules! get_name {
     ($($name:ident = $id:expr),*) => (
         $(
-        pub fn $name(&self, buf: &[u8]) -> Option<String> {
-            let mut names = match self.names(buf) {
+        pub fn $name(&self) -> Option<String> {
+            let mut names = match self.names() {
                 Err(_) => return None,
                 Ok(names) => names,
             };
@@ -74,10 +68,10 @@ macro_rules! get_name {
             let start = self.offset as usize + rec.offset as usize;
             let end = start + rec.length as usize;
 
-            if buf.len() < end {
+            if self.buffer.len() < end {
                 return None
             } else {
-                let s = &buf[start..end];
+                let s = &self.buffer[start..end];
                 Some(decode_mac_roman(s))
             }
         }
@@ -86,15 +80,15 @@ macro_rules! get_name {
 }
 
 
-impl Name {
-    pub fn names<'b>(&self, buf: &'b [u8]) -> Result<NameIter<'b>> {
+impl<'tbl> Name<'tbl> {
+    pub fn names(&'tbl self) -> Result<NameIter<'tbl>> {
         let required = Self::size() + NameRecord::size() * self.count as usize;
 
-        if buf.len() < required {
+        if self.buffer.len() < required {
             return Err(Error::UnexpectedEof);
         }
 
-        let buf = &buf[Self::size()..];
+        let buf = &self.buffer[Self::size()..];
 
         Ok(NameIter {
                buf: buf,
@@ -246,33 +240,31 @@ mod test {
         ($tbl:expr, $buf:expr, $($name:ident = $result:expr),*) => (
             $(
             assert_eq!(
-                &$tbl.$name($buf).unwrap(),
+                &$tbl.$name().unwrap(),
                 $result
             );
             )*
         )
     }
 
-    macro_rules! print_names {
-        ($tbl:expr, $buf:expr, $($name:ident),*) => (
-            $(
-            if let Some(name) = $tbl.$name($buf) {
-                println!(r#"{} = "{}","#, stringify!($name), name);
-            }
-            )*
-        )
-    }
+    // macro_rules! print_names {
+    //     ($tbl:expr, $buf:expr, $($name:ident),*) => (
+    //         $(
+    //         if let Some(name) = $tbl.$name($buf) {
+    //             println!(r#"{} = "{}","#, stringify!($name), name);
+    //         }
+    //         )*
+    //     )
+    // }
 
     #[test]
     fn print_names_opensans() {
-        let buf = open_font!(r"data/OpenSans-Regular.ttf");
+        let buf: Vec<u8> = open_font!(r"data/OpenSans-Regular.ttf");
 
-        let font = Font::from_buffer(&buf).unwrap();
-        let offset = font.get_table_record(Tag(*b"name")).unwrap().offset;
-        let buf = &buf[offset as usize..];
-        let (_, tbl) = Name::parse(buf).unwrap();
+        let font = Font::from_buffer(&buf).expect("unable to parse font");
+        let tbl = font.get_table::<Name>().expect("Failed to read Name table");
 
-        assert_name_eq!(tbl, buf,
+        assert_name_eq!(tbl,
             get_copyright = "Digitized data copyright © 2010-2011, Google Corporation.",
             get_family = "Open Sans",
             get_subfamily = "Regular",
@@ -291,14 +283,12 @@ mod test {
 
     #[test]
     fn print_names_roboto() {
-        let buf = open_font!(r"data/DroidSerif.ttf");
+        let buf: Vec<u8> = open_font!(r"data/DroidSerif.ttf");
 
-        let font = Font::from_buffer(&buf).unwrap();
-        let offset = font.get_table_record(Tag(*b"name")).unwrap().offset;
-        let buf = &buf[offset as usize..];
-        let (_, tbl) = Name::parse(buf).unwrap();
+        let font = Font::from_buffer(&buf).expect("unable to parse font");
+        let tbl = font.get_table::<Name>().expect("Failed to read Name table");
 
-        assert_name_eq!(tbl, buf,
+        assert_name_eq!(tbl,
             get_copyright = "Digitized data copyright © 2007, Google Corporation.",
             get_family = "Droid Serif",
             get_subfamily = "Regular",
