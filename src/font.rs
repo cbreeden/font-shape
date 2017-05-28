@@ -37,7 +37,7 @@ struct OffsetTable {
     range_shift: Ignored<u16>,
 }
 
-#[derive(Table, Debug)]
+#[derive(Table, Debug, PartialEq)]
 pub struct TableRecord {
     pub tag: Tag,
     pub check_sum: u32,
@@ -135,36 +135,59 @@ impl<'a> Iterator for TableIter<'a> {
     }
 }
 
-// #[cfg(test)]
-// mod test {
-//     use super::Font;
-//     use ::decode::primitives::Tag;
+#[cfg(test)]
+mod test {
+    use super::Font;
+    use decode::primitives::Tag;
 
-//     #[test]
-//     fn print_tables() {
-//         use std::fs::File;
-//         use std::io::BufReader;
-//         use std::io::prelude::*;
+    macro_rules! assert_records_eq {
+        ( $tbls:ident, $($tag:expr, check_sum: $check_sum:expr, offset: $offset:expr, length: $length:expr),* $(,)* ) => {
+            $(
+            match $tbls.next() {
+                Some(tbl) => {
+                    assert_eq!(tbl.tag, Tag($tag));
+                    assert_eq!(tbl.check_sum, $check_sum);
+                    assert_eq!(tbl.offset, $offset);
+                    assert_eq!(tbl.length, $length);
+                },
 
-//         let file = File::open(r"data/OpenSans-Regular.ttf")
-//             .expect("Unable to open file");
+                _ => {
+                    panic!("Fewer tables than expected!")
+                }
+            }
+            )*
 
-//         let mut reader = BufReader::new(file);
-//         let mut data   = Vec::new();
-//         reader.read_to_end(&mut data)
-//             .expect("Error reading file");
+            assert_eq!($tbls.next(), None, "More tables than expected!");
+        }
+    }
 
-//         let font = Font::from_buffer(&data)
-//             .expect("Unable to parse font");
+    #[test]
+    fn font_table_records() {
+        let buf = open_font!(r"data/OpenSans-Regular.ttf");
+        let font = Font::from_buffer(&buf).expect("Unable to parse font");
 
-//         for tbl in font.tables() {
-//             println!("{:?}", tbl.unwrap());
-//         }
-//     }
+        let mut tbls = font.tables().expect("Unable to read tables");
 
-//     #[test]
-//     fn test_tag() {
-//         let t = Tag([0x00,0x01,0x00,0x00]);
-//         println!("{:?}", t);
-//     }
-// }
+        assert_records_eq!(tbls,
+            *b"DSIG", check_sum: 2651997213, offset: 211868, length: 5492,
+            *b"GDEF", check_sum: 2491311, offset: 210812, length: 30,
+            *b"GPOS", check_sum: 188157751, offset: 210844, length: 56,
+            *b"GSUB", check_sum: 237714871, offset: 210900, length: 966,
+            *b"OS/2", check_sum: 2705235657, offset: 440, length: 96,
+            *b"cmap", check_sum: 699084648, offset: 4276, length: 1050,
+            *b"cvt ", check_sum: 256710820, offset: 7568, length: 162,
+            *b"fpgm", check_sum: 2120332817, offset: 5328, length: 1972,
+            *b"gasp", check_sum: 1376291, offset: 210796, length: 16,
+            *b"glyf", check_sum: 1949866315, offset: 9612, length: 77748,
+            *b"head", check_sum: 4151763622, offset: 316, length: 54,
+            *b"hhea", check_sum: 231475571, offset: 372, length: 36,
+            *b"hmtx", check_sum: 3895803101, offset: 536, length: 3738,
+            *b"kern", check_sum: 1412106622, offset: 87360, length: 112182,
+            *b"loca", check_sum: 689233137, offset: 7732, length: 1878,
+            *b"maxp", check_sum: 88277514, offset: 408, length: 32,
+            *b"name", check_sum: 1940949125, offset: 199544, length: 1479,
+            *b"post", check_sum: 38006636, offset: 201024, length: 9771,
+            *b"prep", check_sum: 1136105124, offset: 7300, length: 265,        
+        );
+    }
+}

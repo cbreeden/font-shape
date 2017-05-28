@@ -258,7 +258,7 @@ mod test {
     // }
 
     #[test]
-    fn print_names_opensans() {
+    fn names_opensans() {
         let buf: Vec<u8> = open_font!(r"data/OpenSans-Regular.ttf");
 
         let font = Font::from_buffer(&buf).expect("unable to parse font");
@@ -282,7 +282,7 @@ mod test {
     }
 
     #[test]
-    fn print_names_roboto() {
+    fn names_roboto() {
         let buf: Vec<u8> = open_font!(r"data/DroidSerif.ttf");
 
         let font = Font::from_buffer(&buf).expect("unable to parse font");
