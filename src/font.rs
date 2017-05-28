@@ -187,7 +187,7 @@ mod test {
             *b"maxp", check_sum: 88277514, offset: 408, length: 32,
             *b"name", check_sum: 1940949125, offset: 199544, length: 1479,
             *b"post", check_sum: 38006636, offset: 201024, length: 9771,
-            *b"prep", check_sum: 1136105124, offset: 7300, length: 265,        
+            *b"prep", check_sum: 1136105124, offset: 7300, length: 265,
         );
     }
 }

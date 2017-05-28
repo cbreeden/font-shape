@@ -1,5 +1,5 @@
-// pub mod hhea;
-// pub mod maxp;
+pub mod hhea;
+pub mod maxp;
 // pub mod os2;
 pub mod name;
 // pub mod cmap;
@@ -26,4 +26,6 @@ macro_rules! impl_tagged_table {
 
 impl_tagged_table!(
     name::Name<'tbl> => *b"name",
+    hhea::Hhea => *b"hhea",
+    maxp::Maxp => *b"maxp",
 );

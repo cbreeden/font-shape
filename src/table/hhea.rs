@@ -28,29 +28,29 @@ pub struct Hhea {
 mod test {
     use ::font::Font;
     use ::font::TableRecord;
-    use ::decode::primitives::Tag;
+    use ::decode::primitives::{Tag, FWord, UFWord};
     use ::table::hhea::Hhea;
     use ::decode::Table;
 
     #[test]
     fn print_tables() {
-        use std::fs::File;
-        use std::io::BufReader;
-        use std::io::prelude::*;
+        let buf = open_font!("data/OpenSans-Regular.ttf");
+        let font = Font::from_buffer(&buf).expect("Unable to parse font");
+        let tbl = font.get_table::<Hhea>().expect("unable to read hhea table");
 
-        let file = open_font!("data/OpenSans-Regular.ttf");
-
-        let font = Font::from_buffer(&file)
-            .expect("Unable to parse font");
-
-        let TableRecord { offset: offset, .. } = font.tables()
-            .map(|tr| tr.unwrap())
-            .find(|tr| tr.tag == Tag(*b"head"))
-            .unwrap();
-
-        let buf = &data[offset as usize..];
-        let (_, hhea) = Hhea::parse(buf).unwrap();
-
-        println!("{:#?}", hhea);
+        assert_eq!(tbl.major_version, 1);
+        assert_eq!(tbl.minor_version, 0);
+        assert_eq!(tbl.ascent, FWord(2189));
+        assert_eq!(tbl.descent, FWord(-600));
+        assert_eq!(tbl.line_gap, FWord(0));
+        assert_eq!(tbl.advance_width_max, UFWord(2476));
+        assert_eq!(tbl.min_left_side_bearing, FWord(-1126));
+        assert_eq!(tbl.min_right_side_bearing, FWord(-389));
+        assert_eq!(tbl.x_max_extent, FWord(2466));
+        assert_eq!(tbl.caret_slope_rise, 1);
+        assert_eq!(tbl.caret_slope_run, 0);
+        assert_eq!(tbl.caret_offset, 0);
+        assert_eq!(tbl.metric_data_format, 0);
+        assert_eq!(tbl.number_of_h_metrics, 931);
     }
 }

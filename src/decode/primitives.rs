@@ -44,15 +44,15 @@ impl_data_type!(
 // A 32-bit signed fixed-point number (16.16)
 // pub struct Fixed(i32);
 #[derive(Debug, Copy, Clone, Hash, PartialEq, Eq, From)]
-pub struct Fixed(i32);
+pub struct Fixed(pub i32);
 
 /// A signed unit to describe a quantity in a font's internal design units.
 /// The scale is described in ___.  This is often 1/1000 EMs.
 #[derive(Debug, Copy, Clone, Hash, PartialEq, Eq, From)]
-pub struct FWord(i16);
+pub struct FWord(pub i16);
 
 #[derive(Debug, Copy, Clone, Hash, PartialEq, Eq, From)]
-pub struct F2Dot14(i16);
+pub struct F2Dot14(pub i16);
 
 /// An usigned unit to describe a quantity in a font's internal design units.
 /// The scale is described in ___.  This is often 1/1000 EMs.
@@ -117,7 +117,7 @@ impl Primitive for U24 {
     }
 }
 
-#[derive(Debug, Copy, Clone, Hash, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(Copy, Clone, Hash, PartialEq, Eq, PartialOrd, Ord)]
 pub struct Ignored<T> {
     _phantom: PhantomData<T>,
 }
@@ -126,5 +126,11 @@ impl<T> Primitive for Ignored<T> where T: Primitive {
     fn size() -> usize { T::size() }
     fn parse(_: &[u8]) -> Result<Self> {
         Ok(Ignored { _phantom: PhantomData })
+    }
+}
+
+impl<T> fmt::Debug for Ignored<T> {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "Ignored")
     }
 }

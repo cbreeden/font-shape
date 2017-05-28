@@ -7,13 +7,12 @@ pub enum Maxp {
     Version1(Version1),
 }
 
-impl Primitive for Maxp {
-    fn size() -> usize { 4 }
-    fn parse(buffer: &[u8]) -> Result<Maxp> {
-        let version = u32::parse(buffer)?;
+impl<'tbl> Table<'tbl> for Maxp {
+    fn parse(mut buffer: &[u8]) -> Result<Maxp> {
+        let version = buffer.read::<u32>()?;
         match version {
             0x00005000 => {
-                let n = u16::parse(buffer)?;
+                let n = buffer.read::<u16>()?;
                 Ok(Maxp::Version05 { num_glyphs: n })
             },
 
@@ -22,7 +21,9 @@ impl Primitive for Maxp {
                 Ok(Maxp::Version1(tbl))
             },
 
-            _ => Err(Error::InvalidData)
+            _ => {
+                Err(Error::InvalidData)
+            }
         }
     }
 }
@@ -54,30 +55,26 @@ mod test {
     use ::decode::Table;
 
     #[test]
-    fn print_tables() {
-        use std::fs::File;
-        use std::io::BufReader;
-        use std::io::prelude::*;
+    fn maxp() {
+        let buf = open_font!(r"data/Roboto-Regular.ttf");
+        let font = Font::from_buffer(&buf).expect("Unable to parse font");
+        let tbl = font.get_table::<Maxp>().expect("Unable to read Maxp table");
 
-        let file = File::open(r"data/Roboto-Regular.ttf")
-            .expect("Unable to open file");
-
-        let mut reader = BufReader::new(file);
-        let mut data   = Vec::new();
-        reader.read_to_end(&mut data)
-            .expect("Error reading file");
-
-        let font = Font::from_buffer(&data)
-            .expect("Unable to parse font");
-
-        let TableRecord { offset: offset, .. } = font.tables()
-            .map(|tr| tr.unwrap())
-            .find(|tr| tr.tag == Tag(*b"maxp"))
-            .unwrap();
-
-        let buf = &data[offset as usize..];
-        let (_, maxp) = Maxp::parse(buf).unwrap();
-
-        println!("{:#?}", maxp);
+        if let Maxp::Version1(maxp) = tbl {
+            assert_eq!(maxp.num_glyphs, 1294);
+            assert_eq!(maxp.max_points, 143);
+            assert_eq!(maxp.max_contours, 22);
+            assert_eq!(maxp.max_composite_points, 84);
+            assert_eq!(maxp.max_composite_contours, 5);
+            assert_eq!(maxp.max_zones, 1);
+            assert_eq!(maxp.max_twilight_points, 0);
+            assert_eq!(maxp.max_storage, 0);
+            assert_eq!(maxp.max_function_defs, 14);
+            assert_eq!(maxp.max_instruction_defs, 0);
+            assert_eq!(maxp.max_stack_elements, 512);
+            assert_eq!(maxp.max_size_of_instructions, 548);
+            assert_eq!(maxp.max_component_elements, 6);
+            assert_eq!(maxp.max_component_depth, 1);
+        } else { panic!("Parsed incorrect version for maxp"); }
     }
 }
