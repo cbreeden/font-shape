@@ -72,7 +72,7 @@ mod test {
 
         let TableRecord { offset: offset, .. } = font.tables()
             .map(|tr| tr.unwrap())
-            .find(|tr| tr.tag == tag!('m','a','x','p'))
+            .find(|tr| tr.tag == Tag(*b"maxp"))
             .unwrap();
 
         let buf = &data[offset as usize..];

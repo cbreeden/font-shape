@@ -1,5 +1,5 @@
 use decode::{Error, Result, SizedTable, Table, Primitive, ReadPrimitive, ReadTable};
-use decode::primitives::Tag;
+use decode::primitives::{Tag, Ignored};
 
 use table::name::Name;
 
@@ -30,9 +30,9 @@ impl Primitive for Version {
 struct OffsetTable {
     sfnt_version: Version,
     num_tables: u16,
-    search_range: u16,
-    entry_selector: u16,
-    range_shift: u16,
+    search_range: Ignored<u16>,
+    entry_selector: Ignored<u16>,
+    range_shift: Ignored<u16>,
 }
 
 #[derive(Table, Debug)]

@@ -18,11 +18,11 @@ pub trait Primitive: Sized {
 }
 
 pub trait ReadPrimitive {
-    fn parse<T: Primitive>(&mut self) -> Result<T>;
+    fn read<T: Primitive>(&mut self) -> Result<T>;
 }
 
 impl<'a> ReadPrimitive for &'a [u8] {
-    fn parse<T: Primitive>(&mut self) -> Result<T> {
+    fn read<T: Primitive>(&mut self) -> Result<T> {
         if self.len() < T::size() {
             return Err(Error::UnexpectedEof)
         }

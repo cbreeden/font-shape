@@ -35,7 +35,7 @@ fn impl_parse(ast: &syn::DeriveInput) -> quote::Tokens {
             let ty = &field.ty;
 
             quote! {
-                let #ident = buf.parse::<#ty>()?;
+                let #ident = buf.read::<#ty>()?;
             }
         });
     let build = variants

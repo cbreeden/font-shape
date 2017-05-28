@@ -38,20 +38,14 @@ mod test {
         use std::io::BufReader;
         use std::io::prelude::*;
 
-        let file = File::open(r"data/OpenSans-Regular.ttf")
-            .expect("Unable to open file");
+        let file = open_font!("data/OpenSans-Regular.ttf");
 
-        let mut reader = BufReader::new(file);
-        let mut data   = Vec::new();
-        reader.read_to_end(&mut data)
-            .expect("Error reading file");
-
-        let font = Font::from_buffer(&data)
+        let font = Font::from_buffer(&file)
             .expect("Unable to parse font");
 
         let TableRecord { offset: offset, .. } = font.tables()
             .map(|tr| tr.unwrap())
-            .find(|tr| tr.tag == tag!('h','h','e','a'))
+            .find(|tr| tr.tag == Tag(*b"head"))
             .unwrap();
 
         let buf = &data[offset as usize..];

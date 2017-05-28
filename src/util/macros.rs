@@ -26,12 +26,6 @@ macro_rules! versioned_table {
     }
 }
 
-macro_rules! tag {
-    ($a:expr, $b:expr, $c:expr, $d:expr) => {
-        ::decode::primitives::Tag([$a as u8, $b as u8, $c as u8, $d as u8])
-    }
-}
-
 macro_rules! _offset {
     (NUL) => { 0 };
 
