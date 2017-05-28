@@ -1,7 +1,5 @@
+use decode::{Error, Result, SizedTable, Table, Primitive, ReadPrimitive, ReadTable};
 use decode::primitives::Tag;
-use decode::Table;
-use decode::StaticSize;
-use decode::{Error, Result};
 
 use table::name::Name;
 
@@ -11,18 +9,22 @@ pub enum Version {
     TrueType,
 }
 
-static_size!(Version = 4);
-versioned_table!(Version,
-    Tag => |tag| {
+impl Primitive for Version {
+    fn size() -> usize { Tag::size() }
+    fn parse(buffer: &[u8]) -> Result<Version> {
         const VERSION1: [u8; 4] = [0x00, 0x01, 0x00, 0x00];
+        let tag = Tag::parse(buffer)?;
         match &tag.0 {
-            b"OTTO" => Version::OpenType,
-            &VERSION1 | b"true" | b"typ1" => Version::TrueType,
-            b"ttcf" => return Err(Error::TtcfUnsupported),
-            _ => return Err(Error::InvalidData),
+            b"OTTO" => Ok(Version::OpenType),
+
+            &VERSION1 | b"true" | b"typ1"
+                => Ok(Version::TrueType),
+
+            b"ttcf" => Err(Error::TtcfUnsupported),
+            _ => Err(Error::InvalidData),
         }
     }
-);
+}
 
 #[derive(Table, Debug)]
 struct OffsetTable {
@@ -50,11 +52,11 @@ pub struct Font<'a> {
 
 impl<'f> Font<'f> {
     pub fn from_buffer<'b: 'f>(buf: &'b [u8]) -> Result<Font<'f>> {
-        if buf.len() < OffsetTable::static_size() {
+        if buf.len() < OffsetTable::size() {
             return Err(Error::InvalidData);
         }
 
-        let (_, offset_table) = OffsetTable::parse(buf)?;
+        let offset_table = OffsetTable::parse(buf)?;
 
         Ok(Font {
                buf: buf,
@@ -64,8 +66,8 @@ impl<'f> Font<'f> {
     }
 
     pub fn tables(&self) -> Result<TableIter> {
-        let shift = OffsetTable::static_size();
-        let required_size = shift + TableRecord::static_size() * self.num_tables as usize;
+        let shift = OffsetTable::size();
+        let required_size = shift + TableRecord::size() * self.num_tables as usize;
 
         if self.buf.len() < required_size {
             return Err(Error::InvalidData);
@@ -100,7 +102,7 @@ impl<'f> Font<'f> {
             .ok_or(Error::InvalidData)?;
 
         let name_buf = &self.buf[offset as usize..];
-        let (_, tbl) = Name::parse(name_buf)?;
+        let tbl = Name::parse(name_buf)?;
         Ok(tbl)
     }
 }
@@ -121,11 +123,9 @@ impl<'a> Iterator for TableIter<'a> {
 
         // The only possible failure is EOF, which is checked
         // for while constructing TableIter.
-        let next = TableRecord::parse(self.buf).unwrap();
-        self.buf = next.0;
         self.pos += 1;
-
-        Some(next.1)
+        let next = self.buf.read_table::<TableRecord>().unwrap();
+        Some(next)
     }
 }
 

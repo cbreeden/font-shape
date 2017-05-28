@@ -1,3 +1,6 @@
+use decode::{Error, Result, SizedTable, Table, Primitive, ReadPrimitive, ReadTable};
+use decode::primitives::Ignored;
+
 // API:
 
 // Eagerly obtain default CMAP on font init,
@@ -8,25 +11,26 @@
 //  - get_glyph_indexes(cps: Iterator<CodePoint>) -> Iterator<GlyphId>
 
 #[derive(Table, Debug)]
-pub struct CmapHeader<'a> {
-    buffer: &'a [u8],
+pub struct CmapHeader<'tbl> {
+    buffer: &'tbl [u8],
     _version: Ignored<u16>,
     pub num_tables: u16,
 }
 
 impl<'a> CmapHeader<'a> {
     fn records(&self) -> Result<RecordIter> {
-        if self.buffer.len() < offset::cmap_header::records
-            + self.num_tables as usize * EncodingRecode::static_size()
-        {
-            return Err(Error::UnexpectedEof)
-        }
+        // if self.buffer.len() < offset::cmap_header::records
+        //     + self.num_tables as usize * EncodingRecode::static_size()
+        // {
+        //     return Err(Error::UnexpectedEof)
+        // }
 
-        Ok(RecordIter {
-            buffer: self.buffer[offset::cmap_header..],
-            num_tables: self.num_tables,
-            current: 0,
-        })
+        // Ok(RecordIter {
+        //     buffer: self.buffer[offset::cmap_header..],
+        //     num_tables: self.num_tables,
+        //     current: 0,
+        // })
+        unimplemented!()
     }
 }
 
@@ -40,13 +44,14 @@ pub struct RecordIter<'a> {
 impl<'a> Iterator for RecordIter<'a> {
     type Item = EncodingRecord<'a>;
     fn next(&mut self) -> Option<Self::Item> {
-        if self.current >= self.num_tables { return None }
-        self.current += 1;
+        // if self.current >= self.num_tables { return None }
+        // self.current += 1;
 
-        let (buf, next) = EncodingRecord::parse(self.buffer)
-            .expect("File bug report");
-        self.buffer = buf;
-        Ok(next)
+        // let (buf, next) = EncodingRecord::parse(self.buffer)
+        //     .expect("File bug report");
+        // self.buffer = buf;
+        // Ok(next)
+        unimplemented!()
     }
 
     fn count(self) -> usize {
@@ -55,15 +60,15 @@ impl<'a> Iterator for RecordIter<'a> {
 
     fn size_hint(&self) -> (usize, Option<usize>) {
         let count = (self.num_tables - self.current) as usize;
-        (count, Ok(count))
+        (count, Some(count))
     }
 }
 
 impl<'a> ExactSizeIterator for RecordIter<'a> { }
 
 #[derive(Table, Debug)]
-pub struct EncodingRecord<'a> {
-    buffer: &'a [u8],
+pub struct EncodingRecord<'tbl> {
+    buffer: &'tbl [u8],
     pub platform: u16,
     pub encoding: u16,
     offset:   u32,
@@ -71,38 +76,40 @@ pub struct EncodingRecord<'a> {
 
 impl<'a> EncodingRecord<'a> {
     fn get_cmap(&self) -> Result<Cmap> {
-        if self.buffer.len() < 4 + self.offset as usize {
-            return Err(Error::UnexpectedEof)
-        }
+        // if self.buffer.len() < 4 + self.offset as usize {
+        //     return Err(Error::UnexpectedEof)
+        // }
 
-        let (_, cmap) = Cmap::parse(self.buffer)?;
-        Ok(cmap)
+        // let (_, cmap) = Cmap::parse(self.buffer)?;
+        // Ok(cmap)
+        unimplemented!()
     }
 }
 
 enum Cmap<'a> {
-    Format0(Format0),
-    Format4(Format4),
-    Format6(Format6),
-    Format12(Format12),
+    Format0(Format0<'a>),
+    Format4(Format4<'a>),
+    Format6(Format6<'a>),
+    Format12(Format12<'a>),
     //Format14(Format14), Require seperate api?
 }
 
-impl Table for Cmap {
-    fn parse(buffer: &[u8]) -> Cmap {
+impl<'tbl> Table<'tbl> for Cmap<'tbl> {
+    fn parse(buffer: &[u8]) -> Result<Cmap<'tbl>>
+    {
         unimplemented!()
     }
 }
 
 #[derive(Table, Debug)]
-pub struct Format0<'a> {
-    buffer: &'a [u8],
+pub struct Format0<'tbl> {
+    buffer: &'tbl [u8],
     language: u16,
 }
 
 #[derive(Table, Debug)]
-pub struct Format4<'a> {
-    buffer: &'a [u8],
+pub struct Format4<'tbl> {
+    buffer: &'tbl [u8],
     language: u16,
     seg_count_x2: u16,
     search_range: u16,
@@ -111,16 +118,16 @@ pub struct Format4<'a> {
 }
 
 #[derive(Table, Debug)]
-pub struct Format6<'a> {
-    buffer: &'a [u8],
+pub struct Format6<'tbl> {
+    buffer: &'tbl [u8],
     language: u16,
     first_code: u16,
     entry_count: u16,
 }
 
 #[derive(Table, Debug)]
-pub struct Format12<'a> {
-    buffer: &'a [u8],
+pub struct Format12<'tbl> {
+    buffer: &'tbl [u8],
     language: u32,
     num_groups: u32,
 }

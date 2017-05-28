@@ -1,7 +1,5 @@
-use decode::primitives::{Tag, FWord, UFWord, Reserved};
-use decode::Table;
-use decode::StaticSize;
-use decode::{Error, Result};
+use decode::primitives::{Tag, FWord, UFWord, Ignored};
+use decode::{Error, Result, SizedTable, Table, Primitive, ReadPrimitive, ReadTable};
 
 offsets! {
     version: u16,

@@ -1,7 +1,5 @@
-use decode::primitives::{Tag, FWord, UFWord, Reserved};
-use decode::Table;
-use decode::StaticSize;
-use decode::{Error, Result};
+use decode::primitives::{Tag, FWord, UFWord, Ignored};
+use decode::{Error, Result, SizedTable, Table, Primitive, ReadPrimitive, ReadTable};
 
 /// horizontal fonts header table
 #[derive(Debug, Table)]
@@ -18,10 +16,10 @@ pub struct Hhea {
     pub caret_slope_rise: i16,
     pub caret_slope_run: i16,
     pub caret_offset: i16,
-    _reserved1: Reserved<u16>,
-    _reserved2: Reserved<u16>,
-    _reserved3: Reserved<u16>,
-    _reserved4: Reserved<u16>,
+    _reserved1: Ignored<u16>,
+    _reserved2: Ignored<u16>,
+    _reserved3: Ignored<u16>,
+    _reserved4: Ignored<u16>,
     pub metric_data_format: i16,
     pub number_of_h_metrics: i16,
 }

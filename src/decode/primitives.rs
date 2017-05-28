@@ -1,56 +1,79 @@
-use decode;
-use decode::Table;
-use decode::StaticSize;
-use decode::{Result, Error};
-
+use byteorder::{BigEndian, ByteOrder};
+use decode::{Error, Result, Primitive};
 use std::fmt;
 use std::marker::PhantomData;
 
-#[derive(Debug, Clone, Copy, PartialEq)]
-pub struct Fixed(pub f64);
-
-impl From<i32> for Fixed {
-    fn from(n: i32) -> Fixed {
-        let fp = (n as f64) / (2u16.pow(16) as f64);
-        Fixed(fp)
-    }
+macro_rules! impl_data_type {
+    ($($conv:expr => $data_type:tt),* $(,)*) => (
+        $(
+            impl Primitive for $data_type {
+                fn size() -> usize { ::std::mem::size_of::<$data_type>() }
+                fn parse(buffer: &[u8]) -> Result<$data_type> {
+                    Ok($data_type::from($conv(buffer)))
+                }
+            }
+        )*
+    );
 }
 
-#[derive(Debug, Clone, Copy, PartialEq)]
-pub struct F2Dot14(pub f32);
+fn read_u8(buffer: &[u8]) -> u8 {
+     buffer[0]
+}
 
-impl From<i16> for F2Dot14 {
-    fn from(n: i16) -> F2Dot14 {
-        let fp = (n as f32) / (2u16.pow(14) as f32);
-        F2Dot14(fp)
-    }
+fn read_i8(buffer: &[u8]) -> i8 {
+     buffer[0] as i8
 }
 
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct FWord(pub i16);
+impl_data_type!(
+    BigEndian::read_i16 => FWord,
+    BigEndian::read_u16 => UFWord,
+    BigEndian::read_i16 => F2Dot14,
+    BigEndian::read_i32 => Fixed,
+    BigEndian::read_u16 => Offset16,
+    BigEndian::read_u32 => Offset32,
 
-impl From<i16> for FWord {
-    fn from(n: i16) -> FWord {
-        FWord(n)
-    }
-}
+    read_u8  => u8,
+    read_i8  => i8,
+    BigEndian::read_u16 => u16,
+    BigEndian::read_i16 => i16,
+    BigEndian::read_u32 => u32,
+    BigEndian::read_i32 => i32,
+);
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+// A 32-bit signed fixed-point number (16.16)
+// pub struct Fixed(i32);
+#[derive(Debug, Copy, Clone, Hash, PartialEq, Eq, From)]
+pub struct Fixed(i32);
+
+/// A signed unit to describe a quantity in a font's internal design units.
+/// The scale is described in ___.  This is often 1/1000 EMs.
+#[derive(Debug, Copy, Clone, Hash, PartialEq, Eq, From)]
+pub struct FWord(i16);
+
+#[derive(Debug, Copy, Clone, Hash, PartialEq, Eq, From)]
+pub struct F2Dot14(i16);
+
+/// An usigned unit to describe a quantity in a font's internal design units.
+/// The scale is described in ___.  This is often 1/1000 EMs.
+#[derive(Debug, Copy, Clone, Hash, PartialEq, Eq, From)]
 pub struct UFWord(pub u16);
 
-impl From<u16> for UFWord {
-    fn from(n: u16) -> UFWord {
-        UFWord(n)
-    }
-}
+#[derive(Debug, Copy, Clone, Hash, PartialEq, Eq, From)]
+pub struct Offset16(pub u16);
 
-#[derive(Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Copy, Clone, Hash, PartialEq, Eq, From)]
+pub struct Offset32(pub u32);
+
+/// Usually used to identify a table name, script, language system, or feature.
+#[derive(Copy, Clone, Hash, PartialEq, Eq, PartialOrd, Ord)]
 pub struct Tag(pub [u8; 4]);
 
-impl From<[u8; 4]> for Tag {
-    fn from(b: [u8; 4]) -> Tag {
-        Tag(b)
+impl From<u32> for Tag {
+    fn from(n: u32) -> Tag {
+        let mut tag = [0; 4];
+        BigEndian::write_u32(&mut tag, n);
+        Tag(tag)
     }
 }
 
@@ -70,60 +93,38 @@ impl fmt::Debug for Tag {
                 | (self.0[2] as u32) << 8
                 | (self.0[3] as u32);
 
-            //TODO: This shouldn't look like a string
-            f.debug_tuple("Tag")
-                .field(&format!("0x{:08X}", n))
-                .finish()
+            write!(f, "Tag(0x{:08X})", n)
         }
     }
 }
 
-#[derive(Debug, Clone, Copy)]
-pub struct Offset16(u16);
-
-impl From<u16> for Offset16 {
-    fn from(n: u16) -> Offset16 {
-        Offset16(n)
+impl Primitive for Tag {
+    fn size() -> usize { 4 }
+    fn parse(buffer: &[u8]) -> Result<Self> {
+        let mut tag = [0; 4];
+        tag.copy_from_slice(&buffer[..4]);
+        Ok(Tag(tag))
     }
 }
-
-#[derive(Debug, Clone, Copy)]
-pub struct Offset32(pub u32);
-
-impl From<u32> for Offset32 {
-    fn from(n: u32) -> Offset32 {
-        Offset32(n)
-    }
-}
-
-impl_parse!(be_u8_4 => Tag; 4);
-
-impl_parse!(
-    be_i32 => Fixed;    4,
-    be_i16 => F2Dot14;  2,
-    be_i16 => FWord;    2,
-    be_u16 => UFWord;   2,
-    be_u8  => u8;       1,
-    be_i8  => i8;       1,
-    be_u16 => u16;      2,
-    be_i16 => i16;      2,
-    be_u32 => u32;      4,
-    be_i32 => i32;      4,
-    be_u16 => Offset16; 2,
-    be_u32 => Offset32; 4
-);
 
 #[derive(Debug, Copy, Clone, Hash, PartialEq, Eq, PartialOrd, Ord)]
-pub struct Reserved<T> {
+pub struct U24(pub u32);
+
+impl Primitive for U24 {
+    fn size() -> usize { 3 }
+    fn parse(buffer: &[u8]) -> Result<Self> {
+        Ok(U24(BigEndian::read_uint(buffer, 3) as u32))
+    }
+}
+
+#[derive(Debug, Copy, Clone, Hash, PartialEq, Eq, PartialOrd, Ord)]
+pub struct Ignored<T> {
     _phantom: PhantomData<T>,
 }
 
-impl<T> StaticSize for Reserved<T> where T: StaticSize {
-    fn static_size() -> usize { T::static_size() }
-}
-
-impl<T> Table for Reserved<T> where T: StaticSize {
-    fn parse(buf: &[u8]) -> Result<(&[u8], Self)> {
-        Ok((buf, Reserved { _phantom: PhantomData }))
+impl<T> Primitive for Ignored<T> where T: Primitive {
+    fn size() -> usize { T::size() }
+    fn parse(_: &[u8]) -> Result<Self> {
+        Ok(Ignored { _phantom: PhantomData })
     }
 }

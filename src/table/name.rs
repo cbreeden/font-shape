@@ -1,6 +1,4 @@
-use decode::Table;
-use decode::StaticSize;
-use decode::{Error, Result};
+use decode::{Error, Result, SizedTable, Table, Primitive, ReadPrimitive, ReadTable};
 
 // API Guidelines:
 //
@@ -90,13 +88,13 @@ macro_rules! get_name {
 
 impl Name {
     pub fn names<'b>(&self, buf: &'b [u8]) -> Result<NameIter<'b>> {
-        let required = Self::static_size() + NameRecord::static_size() * self.count as usize;
+        let required = Self::size() + NameRecord::size() * self.count as usize;
 
         if buf.len() < required {
             return Err(Error::UnexpectedEof);
         }
 
-        let buf = &buf[Self::static_size()..];
+        let buf = &buf[Self::size()..];
 
         Ok(NameIter {
                buf: buf,
@@ -141,10 +139,10 @@ impl<'a> Iterator for NameIter<'a> {
             return None;
         }
 
-        let (buf, name) = NameRecord::parse(self.buf).expect("Fatal error: Please report!");
-
-        self.buf = buf;
         self.n += 1;
+        let name = self.buf.read_table::<NameRecord>()
+            .expect("Fatal error: Please report!");
+
         Some(name)
     }
 }

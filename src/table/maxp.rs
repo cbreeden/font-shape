@@ -1,7 +1,5 @@
-use decode::primitives::{Tag, FWord, UFWord, Reserved};
-use decode::Table;
-use decode::StaticSize;
-use decode::{Error, Result};
+use decode::primitives::{Tag, FWord, UFWord, Ignored};
+use decode::{Error, Result, SizedTable, Table, Primitive, ReadPrimitive, ReadTable};
 
 #[derive(Debug)]
 pub enum Maxp {
@@ -9,22 +7,25 @@ pub enum Maxp {
     Version1(Version1),
 }
 
-static_size!(Maxp = 4);
-versioned_table!(Maxp,
-    u32 => |buf, v| {
-        match v {
+impl Primitive for Maxp {
+    fn size() -> usize { 4 }
+    fn parse(buffer: &[u8]) -> Result<Maxp> {
+        let version = u32::parse(buffer)?;
+        match version {
             0x00005000 => {
-                let (buf, n) = u16::parse(buf)?;
-                (buf, Maxp::Version05 { num_glyphs: n })
+                let n = u16::parse(buffer)?;
+                Ok(Maxp::Version05 { num_glyphs: n })
             },
+
             0x00010000 => {
-                let (buf, tbl) = Version1::parse(buf)?;
-                (buf, Maxp::Version1(tbl))
+                let tbl = Version1::parse(buffer)?;
+                Ok(Maxp::Version1(tbl))
             },
-            _ => return Err(Error::InvalidData),
+
+            _ => Err(Error::InvalidData)
         }
     }
-);
+}
 
 #[derive(Debug, Table)]
 pub struct Version1 {

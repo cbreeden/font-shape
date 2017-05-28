@@ -25,17 +25,17 @@ fn impl_parse(ast: &syn::DeriveInput) -> quote::Tokens {
 
     let (impl_generics, ty_generics, where_clause) = ast.generics.split_for_impl();
     let ident = &ast.ident;
-    let idents = variants.iter()
-        .filter(|field| field.ident.as_ref().unwrap() != "buf")
+    let tys = variants.iter()
+        .filter(|field| field.ident.as_ref().unwrap() != "buffer")
         .map(|field| &field.ty);
     let parse = variants.iter()
-        .filter(|field| field.ident.as_ref().unwrap() != "buf")
+        .filter(|field| field.ident.as_ref().unwrap() != "buffer")
         .map(|field| {
             let ident = field.ident.as_ref().unwrap();
             let ty = &field.ty;
 
             quote! {
-                let (_buf, #ident ) = <#ty> ::parse(_buf)?;
+                let #ident = buf.parse::<#ty>()?;
             }
         });
     let build = variants
@@ -44,24 +44,26 @@ fn impl_parse(ast: &syn::DeriveInput) -> quote::Tokens {
         .map(|id| quote! { #id : #id });
 
     quote! {
-        impl #impl_generics StaticSize for #ident #ty_generics #where_clause {
-            fn static_size() -> usize {
-                #(<#idents>::static_size())+*
+        impl #impl_generics SizedTable for #ident #ty_generics #where_clause {
+            fn size() -> usize {
+                #(<#tys>::size())+*
             }
         }
 
-        impl #impl_generics Table for #ident #ty_generics #where_clause {
-            fn parse(buf: &[u8]) -> Result<(&[u8], Self)> {
-                if buf.len() < Self::static_size() {
+        impl<'tbl> Table<'tbl> for #ident #ty_generics #where_clause {
+            fn parse(buffer: &'tbl [u8]) -> Result<Self> {
+                if buffer.len() < Self::size() {
                     return Err(Error::UnexpectedEof)
                 }
 
-                let _buf = buf;
+                let mut buf = buffer;
                 #(#parse)*
 
-                Ok((_buf, #ident {
+                Ok(#ident {
+                    // buffer: buffer, (if it exists)
+                    // var1: va1,
                     #(#build),*
-                }))
+                })
             }
         }
     }
