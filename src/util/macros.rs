@@ -1,31 +1,4 @@
-macro_rules! versioned_table {
-    ($name:ty, $i:ty => |$arg:pat| $body:block) => {
-        impl Table for $name {
-            fn parse(buf: &[u8]) -> Result<(&[u8], $name)> {
-                if buf.len() < Self::static_size() {
-                    return Err(Error::UnexpectedEof)
-                }
-
-                let (buf, $arg) = <$i>::parse(buf)?;
-                Ok((buf, $body))
-            }
-        }
-    };
-
-    ($name:ty, $i:ty => |$buf: pat, $arg:pat| $body:block) => {
-        impl Table for $name {
-            fn parse(buf: &[u8]) -> Result<(&[u8], $name)> {
-                if buf.len() < Self::static_size() {
-                    return Err(Error::UnexpectedEof)
-                }
-
-                let ($buf, $arg) = <$i>::parse(buf)?;
-                Ok($body)
-            }
-        }
-    }
-}
-
+#[allow(unused_macros)]
 macro_rules! _offset {
     (NUL) => { 0 };
 
@@ -43,6 +16,7 @@ macro_rules! _offset {
     (Tag)    => { 4 };
 }
 
+#[allow(unused_macros)]
 macro_rules! offsets {
     (@item $pname:tt $pty:tt $name:tt: $ty:tt,) => {
         pub const $name: usize = $pname + _offset!($pty);
@@ -82,6 +56,7 @@ macro_rules! offsets {
 // Test related Macros
 //
 
+#[allow(unused_macros)]
 macro_rules! open_font {
     ($name:expr) => ({
         use std::fs::File;

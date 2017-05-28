@@ -111,16 +111,6 @@ impl<'f> Font<'f> {
             Err(_) => None,
         }
     }
-
-    pub fn get_name_table(&self) -> Result<Name> {
-        // Get the name table.
-        let offset = self.get_table_offset(Tag(*b"name"))
-            .ok_or(Error::InvalidData)?;
-
-        let name_buf = &self.buf[offset as usize..];
-        let tbl = Name::parse(name_buf)?;
-        Ok(tbl)
-    }
 }
 
 pub struct TableIter<'a> {
