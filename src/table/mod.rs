@@ -3,7 +3,7 @@ pub mod hhea;
 pub mod maxp;
 pub mod os2;
 pub mod name;
-// pub mod cmap;
+pub mod cmap;
 
 use decode::primitives::Tag;
 use decode::Table;
@@ -31,4 +31,5 @@ impl_tagged_table!(
     maxp::Maxp => *b"maxp",
     os2::Os2<'tbl> => *b"OS/2",
     head::Head<'tbl> => *b"head",
+    cmap::CmapHeader<'tbl> => *b"cmap",
 );

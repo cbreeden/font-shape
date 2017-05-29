@@ -1,4 +1,5 @@
-#[allow(unused_macros)]
+#![allow(unused_macros)]
+
 macro_rules! _offset {
     (NUL) => { 0 };
 
@@ -17,7 +18,6 @@ macro_rules! _offset {
     (Fixed)  => { 4 };
 }
 
-#[allow(unused_macros)]
 macro_rules! offsets {
     (@item $pname:tt $pty:tt $name:tt: $ty:tt,) => {
         pub const $name: usize = $pname + _offset!($pty);
@@ -86,7 +86,6 @@ macro_rules! assert_offset_table {
 // Test related Macros
 //
 
-#[allow(unused_macros)]
 macro_rules! open_font {
     ($name:expr) => ({
         use std::fs::File;

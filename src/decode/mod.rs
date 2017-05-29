@@ -6,6 +6,7 @@ pub enum Error {
     InvalidData,
     UnexpectedEof,
     TtcfUnsupported,
+    UnsupportedCmapFormat,
 }
 
 pub type Result<T> = result::Result<T, Error>;
@@ -24,7 +25,7 @@ pub trait ReadPrimitive {
 impl<'a> ReadPrimitive for &'a [u8] {
     fn read<T: Primitive>(&mut self) -> Result<T> {
         if self.len() < T::size() {
-            return Err(Error::UnexpectedEof)
+            return Err(Error::UnexpectedEof);
         }
 
         let result = T::parse(self);
@@ -48,11 +49,15 @@ pub trait ReadTable<'tbl> {
 impl<'a: 'tbl, 'tbl> ReadTable<'tbl> for &'a [u8] {
     fn read_table<T: Table<'tbl> + SizedTable>(&mut self) -> Result<T> {
         if self.len() < T::size() {
-            return  Err(Error::UnexpectedEof)
+            return Err(Error::UnexpectedEof);
         }
 
         let result = T::parse(self);
         *self = &self[T::size()..];
         result
     }
+}
+
+pub trait TableInherited<'tbl>: Sized {
+    fn parse(&'tbl [u8], inherited: &'tbl [u8]) -> Result<Self>;
 }
