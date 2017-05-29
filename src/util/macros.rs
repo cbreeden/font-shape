@@ -58,7 +58,7 @@ macro_rules! impl_offset_table {
         offsets!($($name: $ty,)*);
         impl<'tbl> $tbl<'tbl> {
             $(
-                fn $name(&self) -> $ty {
+                pub fn $name(&self) -> $ty {
                     $ty::parse(&self.buffer[offsets::$name..])
                         .expect("fatal error parsing field")
                 }
