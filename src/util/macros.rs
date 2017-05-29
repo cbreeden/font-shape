@@ -14,6 +14,7 @@ macro_rules! _offset {
 
     (Panose) => { 10 };
     (Tag)    => { 4 };
+    (Fixed)  => { 4 };
 }
 
 #[allow(unused_macros)]
@@ -51,6 +52,35 @@ macro_rules! offsets {
         }
     }
 }
+
+macro_rules! impl_offset_table {
+    ($tbl:ident, $($name:tt: $ty:tt,)*) => (
+        offsets!($($name: $ty,)*);
+        impl<'tbl> $tbl<'tbl> {
+            $(
+                fn $name(&self) -> $ty {
+                    $ty::parse(&self.buffer[offsets::$name..])
+                        .expect("fatal error parsing field")
+                }
+            )*
+        }
+    )
+}
+
+macro_rules! print_offset_table {
+    ($tbl:expr, $($field:ident,)* $(,)*) => (
+        $( println!("{}: {:?}", stringify!($field), $tbl.$field()); )*
+    )
+}
+
+macro_rules! assert_offset_table {
+    ($tbl:ident, $($field:tt: $value:expr,)*) => (
+        $(
+            assert_eq!($tbl.$field(), $value);
+        )*
+    )
+}
+
 
 //
 // Test related Macros

@@ -39,6 +39,7 @@ impl_data_type!(
     BigEndian::read_i16 => i16,
     BigEndian::read_u32 => u32,
     BigEndian::read_i32 => i32,
+    BigEndian::read_i64 => i64,
 );
 
 // A 32-bit signed fixed-point number (16.16)

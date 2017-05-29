@@ -1,6 +1,7 @@
+pub mod head;
 pub mod hhea;
 pub mod maxp;
-// pub mod os2;
+pub mod os2;
 pub mod name;
 // pub mod cmap;
 
@@ -28,4 +29,6 @@ impl_tagged_table!(
     name::Name<'tbl> => *b"name",
     hhea::Hhea => *b"hhea",
     maxp::Maxp => *b"maxp",
+    os2::Os2<'tbl> => *b"OS/2",
+    head::Head<'tbl> => *b"head",
 );
