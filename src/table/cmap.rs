@@ -10,13 +10,23 @@ use decode::primitives::Ignored;
 //  - get_glyph_index(CodePoint) -> GlyphId;
 //  - get_glyph_indexes(cps: Iterator<CodePoint>) -> Iterator<GlyphId>
 
-
-enum Cmap<'a> {
+pub enum Cmap<'a> {
     Format0(Format0<'a>), //How to handle encoding?
     Format4(Format4<'a>),
     Format6(Format6<'a>),
     Format12(Format12<'a>),
     //Format14(Format14), Require seperate api?
+}
+
+impl<'a> Cmap<'a> {
+    fn format(&self) -> usize {
+        match *self {
+            Cmap::Format0(_) => 0,
+            Cmap::Format4(_) => 4,
+            Cmap::Format6(_) => 6,
+            Cmap::Format12(_) => 12,
+        }
+    }
 }
 
 impl<'tbl> Table<'tbl> for Cmap<'tbl> {
@@ -33,7 +43,7 @@ pub struct CmapHeader<'tbl> {
 }
 
 impl<'a> CmapHeader<'a> {
-    fn records(&self) -> Result<RecordIter> {
+    pub fn records(&self) -> Result<RecordIter<'a>> {
         let required_size = CmapHeader::size() + self.num_tables as usize * EncodingRecord::size();
 
         if self.buffer.len() < required_size {
@@ -65,8 +75,10 @@ impl<'a> Iterator for RecordIter<'a> {
         }
 
         self.current += 1;
-        let record = EncodingRecord::parse(self.buffer, self.inherited)
-            .expect("Fatal parsing error");
+        let record = match EncodingRecord::parse(self.buffer, self.inherited) {
+            Ok(rec) => rec,
+            Err(_) => unreachable!(),
+        };
         self.buffer = &self.buffer[EncodingRecord::size()..];
         Some(record)
     }
@@ -116,9 +128,8 @@ impl<'tbl> TableInherited<'tbl> for EncodingRecord<'tbl> {
     }
 }
 
-// This won't work
 impl<'a> EncodingRecord<'a> {
-    fn get_cmap(&self) -> Result<Cmap> {
+    pub fn get_cmap(&self) -> Result<Cmap<'a>> {
         // We need to backtrack, since the offset is given relative to CmapHeader
         // Ensure we have enough bytes to jump and read format and length
         if self.buffer.len() < self.offset as usize + 4 {
@@ -155,6 +166,10 @@ pub struct Format4<'tbl> {
     range_shift: u16,
 }
 
+impl<'tbl> Format4<'tbl> {
+    fn get_glyph_index(&self, code: u32) -> u16 {}
+}
+
 #[derive(Table, Debug)]
 pub struct Format6<'tbl> {
     buffer: &'tbl [u8],
@@ -186,21 +201,14 @@ fn list_cmaps() {
     let tbl = font.get_table::<CmapHeader>()
         .expect("Failed to read Cmap Header table");
 
-    println!("Num tables: {}", tbl.num_tables);
+    assert_eq!(tbl.num_tables, 3);
 
-    for record in tbl.records().expect("Unable to parse encoding records") {
-        println!("({:?},{:?},{:?}) ",
-                 record.platform,
-                 record.encoding,
-                 record.offset);
+    let mut records = tbl.records()
+        .expect("Failed to generated Cmap Records iter");
 
-        let cmap = record.get_cmap().expect("unable to read cmap");
-
-        match cmap {
-            Cmap::Format0(_) => println!("Format0"),
-            Cmap::Format4(_) => println!("Format4"),
-            Cmap::Format6(_) => println!("Format6"),
-            Cmap::Format12(_) => println!("Format12"),
-        }
-    }
+    assert_cmap_records!(records,
+        (0, 3, 28)  Format: 4,
+        (1, 0, 148) Format: 0,
+        (3, 1, 28)  Format: 4,
+    );
 }

@@ -81,6 +81,27 @@ macro_rules! assert_offset_table {
     )
 }
 
+macro_rules! assert_cmap_records {
+    ($iter:expr, $(($platform:expr, $encoding:expr, $offset:expr) Format: $fmt:expr,)*) => (
+        $(
+            let next = $iter.next();
+            match next {
+                Some(rec) => {
+                    assert_eq!(rec.platform, $platform);
+                    assert_eq!(rec.encoding, $encoding);
+                    assert_eq!(rec.offset, $offset);
+                    assert_eq!(rec.get_cmap().unwrap().format(), $fmt);
+                },
+                _ => panic!("Fewer cmap records than expected"),
+            }
+        )*
+
+        if $iter.next().is_some() {
+            panic!("More cmap records than expected");
+        }
+    )
+}
+
 
 //
 // Test related Macros

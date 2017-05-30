@@ -130,7 +130,10 @@ impl<'a> Iterator for TableIter<'a> {
         // The only possible failure is EOF, which is checked
         // for while constructing TableIter.
         self.pos += 1;
-        let next = self.buf.read_table::<TableRecord>().unwrap();
+        let next = match self.buf.read_table::<TableRecord>() {
+            Ok(next) => next,
+            Err(_) => unreachable!(),
+        };
         Some(next)
     }
 }
