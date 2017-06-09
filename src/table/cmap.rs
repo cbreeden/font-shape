@@ -2,17 +2,14 @@ use decode::{Error, Result, SizedTable, Table, TableInherited, Primitive, ReadPr
 use decode::primitives::Ignored;
 
 pub enum Cmap<'a> {
-    Format0(Format0<'a>), //How to handle encoding?
     Format4(Format4<'a>),
     Format6(Format6<'a>),
     Format12(Format12<'a>),
-    //Format14(Format14), Require seperate api?
 }
 
 impl<'a> Cmap<'a> {
     fn format(&self) -> usize {
         match *self {
-            Cmap::Format0(_) => 0,
             Cmap::Format4(_) => 4,
             Cmap::Format6(_) => 6,
             Cmap::Format12(_) => 12,
@@ -139,19 +136,12 @@ impl<'a> EncodingRecord<'a> {
         let (_, buffer) = buffer.split_at(2); // length
 
         match version {
-            0 => Ok(Cmap::Format0(Format0::parse(buffer)?)),
             4 => Ok(Cmap::Format4(Format4::parse(buffer)?)),
             6 => Ok(Cmap::Format6(Format6::parse(buffer)?)),
             12 => Ok(Cmap::Format12(Format12::parse(buffer)?)),
             _ => panic!(format!("unsupported cmap version: {}", version)),
         }
     }
-}
-
-#[derive(Table, Debug)]
-pub struct Format0<'tbl> {
-    buffer: &'tbl [u8],
-    language: u16,
 }
 
 #[derive(Debug)]
