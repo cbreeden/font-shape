@@ -247,16 +247,6 @@ mod test {
         )
     }
 
-    // macro_rules! print_names {
-    //     ($tbl:expr, $buf:expr, $($name:ident),*) => (
-    //         $(
-    //         if let Some(name) = $tbl.$name($buf) {
-    //             println!(r#"{} = "{}","#, stringify!($name), name);
-    //         }
-    //         )*
-    //     )
-    // }
-
     #[test]
     fn names_opensans() {
         let buf: Vec<u8> = open_font!(r"data/OpenSans-Regular.ttf");
