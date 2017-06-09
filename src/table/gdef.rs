@@ -49,6 +49,7 @@ impl<'tbl> Table<'tbl> for Header<'tbl> {
             offset_maybe_null!(head, buffer)
         } else { None };
 
+        // Version >= 1.3
         let item_var_store = if minor >= 3 {
             if buffer.len() < 4 {
                 return Err(Error::UnexpectedEof)
@@ -64,5 +65,54 @@ impl<'tbl> Table<'tbl> for Header<'tbl> {
             mark_glyph_sets_def,
             item_var_store,
         })
+    }
+}
+
+pub struct AttachList<'tbl> {
+    coverage: &'tbl [u8],
+    attach_point: &'tbl [u8],
+}
+
+impl<'tbl> Table<'tbl> for AttachList<'tbl> {
+    fn parse(mut buffer: &[u8]) -> Result<AttachList> {
+        if buffer.len() < 4 {
+            return Err(Error::UnexpectedEof)
+        }
+
+        let head = buffer;
+        let coverage_offset = buffer.read::<u16>()?;
+        let glyph_count_size = 2 * buffer.read::<u16>()? as usize;
+
+        if buffer.len() < coverage_offset as usize {
+            return Err(Error::UnexpectedEof)
+        }
+
+        let (_, coverage) = head.split_at(coverage_offset as usize);
+
+        if buffer.len() < glyph_count_size {
+            return Err(Error::UnexpectedEof)
+        }
+
+        let (attach_point, _) = buffer.split_at(glyph_count_size);
+
+        Ok(AttachList { coverage, attach_point })
+    }
+}
+
+pub struct AttachPoint<'tbl> {
+    point_index: &'tbl [u8],
+}
+
+impl<'tbl> Table<'tbl> for AttachPoint<'tbl> {
+    fn parse(mut buffer: &[u8]) -> Result<AttachPoint> {
+        let point_count = 2 * buffer.read::<u16>()? as usize;
+
+        if buffer.len() < point_count {
+            return Err(Error::UnexpectedEof)
+        }
+
+        let (_, point_index) = buffer.split_at(point_count);
+
+        Ok(AttachPoint { point_index })
     }
 }
