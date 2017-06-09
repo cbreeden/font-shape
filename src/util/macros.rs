@@ -102,6 +102,26 @@ macro_rules! assert_cmap_records {
     )
 }
 
+macro_rules! assert_records_eq {
+    ( $tbls:ident, $($tag:expr, check_sum: $check_sum:expr, offset: $offset:expr, length: $length:expr),* $(,)* ) => {
+        $(
+        match $tbls.next() {
+            Some(tbl) => {
+                assert_eq!(tbl.tag, Tag($tag));
+                assert_eq!(tbl.check_sum, $check_sum);
+                assert_eq!(tbl.offset, $offset);
+                assert_eq!(tbl.length, $length);
+            },
+
+            _ => {
+                panic!("Fewer tables than expected!")
+            }
+        }
+        )*
+
+        assert_eq!($tbls.next(), None, "More tables than expected!");
+    }
+}
 
 //
 // Test related Macros

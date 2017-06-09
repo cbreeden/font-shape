@@ -1,15 +1,6 @@
 use decode::{Error, Result, SizedTable, Table, TableInherited, Primitive, ReadPrimitive, ReadTable};
 use decode::primitives::Ignored;
 
-// API:
-
-// Eagerly obtain default CMAP on font init,
-// store this as a Cmap object.
-
-// New api:
-//  - get_glyph_index(CodePoint) -> GlyphId;
-//  - get_glyph_indexes(cps: Iterator<CodePoint>) -> Iterator<GlyphId>
-
 pub enum Cmap<'a> {
     Format0(Format0<'a>), //How to handle encoding?
     Format4(Format4<'a>),
@@ -27,13 +18,22 @@ impl<'a> Cmap<'a> {
             Cmap::Format12(_) => 12,
         }
     }
-}
 
-impl<'tbl> Table<'tbl> for Cmap<'tbl> {
-    fn parse(buffer: &[u8]) -> Result<Cmap<'tbl>> {
-        unimplemented!()
+    fn get_glyph_id(&self, codepoint: u32) -> Option<u16> {
+        match *self {
+            Cmap::Format4(ref cm) => cm.get_glyph_id(codepoint),
+            Cmap::Format6(ref cm) => cm.get_glyph_id(codepoint),
+            Cmap::Format12(ref cm) => cm.get_glyph_id(codepoint),
+            _ => panic!("this cmap format is not implemented"),
+        }
     }
 }
+
+// impl<'tbl> Table<'tbl> for Cmap<'tbl> {
+//     fn parse(buffer: &[u8]) -> Result<Cmap<'tbl>> {
+//         unimplemented!()
+//     }
+// }
 
 #[derive(Table, Debug)]
 pub struct CmapHeader<'tbl> {
@@ -130,15 +130,13 @@ impl<'tbl> TableInherited<'tbl> for EncodingRecord<'tbl> {
 
 impl<'a> EncodingRecord<'a> {
     pub fn get_cmap(&self) -> Result<Cmap<'a>> {
-        // We need to backtrack, since the offset is given relative to CmapHeader
-        // Ensure we have enough bytes to jump and read format and length
         if self.buffer.len() < self.offset as usize + 4 {
             return Err(Error::UnexpectedEof);
         }
 
-        let mut buffer = &self.buffer[self.offset as usize..];
+        let (_, mut buffer) = self.buffer.split_at(self.offset as usize);
         let version = buffer.read::<u16>()?;
-        let _ = buffer.read::<Ignored<u16>>()?; // length
+        let (_, buffer) = buffer.split_at(2); // length
 
         match version {
             0 => Ok(Cmap::Format0(Format0::parse(buffer)?)),
@@ -158,7 +156,6 @@ pub struct Format0<'tbl> {
 
 #[derive(Debug)]
 pub struct Format4<'tbl> {
-    //buffer: &'tbl [u8],
     language: u16,
     end_count: &'tbl [u8],
     start_count: &'tbl [u8],
@@ -177,27 +174,27 @@ impl<'tbl> Table<'tbl> for Format4<'tbl> {
 
         let language  = buffer.read::<u16>()?;
         let seg_count = buffer.read::<u16>()? as usize;
-        let _ /* searchRange */ = buffer.read::<u16>()?;
-        let _ /* entrySelector */ = buffer.read::<u16>()?;
-        let _ /* rangeShift */ = buffer.read::<u16>()?;
+
+        // searchRange, entrySelector, rangeshift
+        let buffer = buffer.split_at(6).1;
 
         if buffer.len() < 4 * seg_count + 2 {
             return Err(Error::UnexpectedEof)
         }
 
         let (end_count, buffer) = buffer.split_at(seg_count);
-        let buffer = &buffer[2..];    // reserved pad + 2
+        let (_, buffer) = buffer.split_at(2);  // reserved pad
         let (start_count, buffer) = buffer.split_at(seg_count);
         let (id_delta, buffer) = buffer.split_at(seg_count);
         let (id_offset, glyph_ids) = buffer.split_at(seg_count);
 
         Ok(Format4 {
-            language: language,
-            end_count: end_count,
-            start_count: start_count,
-            id_delta: id_delta,
-            id_offset: id_offset,
-            glyph_ids: glyph_ids,
+            language,
+            end_count,
+            start_count,
+            id_delta,
+            id_offset,
+            glyph_ids,
         })
     }
 }
@@ -211,7 +208,6 @@ impl<'tbl> Format4<'tbl> {
 
         let codepoint = codepoint as u16;
         let mut idx: usize = 0;
-        let mut found = false;
         let mut segcode: u16 = 0;
 
         while idx <= self.end_count.len() {
@@ -220,22 +216,14 @@ impl<'tbl> Format4<'tbl> {
                 let startcode = BigEndian::read_u16(&self.start_count[idx..]);
                 if startcode <= codepoint {
                     // Found index for containing segment
-                    // Check if there is a corresponding id_offset
-                    found = true;
                     segcode = startcode;
                     break;
                 } else {
-                    // Failed segment containment
                     return None
                 }
             }
 
             idx += 2;
-        }
-
-        // This should be unreachable according to the specs
-        if !found {
-            return None
         }
 
         // Check if there is a corresponding id_offset
@@ -263,79 +251,91 @@ impl<'tbl> Format4<'tbl> {
     }
 }
 
-#[test]
-fn format4() {
-    use font::Font;
-    let buf: Vec<u8> = open_font!(r"data/DroidSerif.ttf");
+#[derive(Debug)]
+pub struct Format6<'tbl> {
+    language: u16,
+    first_code: u16,
+    glyph_id_array: &'tbl [u8],
+}
 
-    let font = Font::from_buffer(&buf).expect("unable to parse font");
-    let tbl = font.get_table::<CmapHeader>()
-        .expect("Failed to read Cmap Header table");
+impl<'tbl> Table<'tbl> for Format6<'tbl> {
+    fn parse(mut buffer: &'tbl [u8]) -> Result<Format6<'tbl>> {
+        if buffer.len() < 6 {
+            return Err(Error::UnexpectedEof)
+        }
 
-    let cmap = tbl.records()
-        .expect("Failed to generated Cmap Records iter")
-        .next()
-        .unwrap();
+        let language = buffer.read::<u16>()?;
+        let first_code = buffer.read::<u16>()?;
+        let entry_count = buffer.read::<u16>()?;
 
-    let cmap = match cmap.get_cmap().unwrap() {
-        Cmap::Format4(c) => c,
-        _ => panic!(),
-    };
+        if buffer.len() < 2 * entry_count as usize {
+            return Err(Error::UnexpectedEof)
+        }
 
-    for c in b'A'..b'z' {
-        let id = cmap.get_glyph_id(c as u32);
-        println!("{:?}: {:?}", ::std::char::from_u32(c as u32), id);
+        let (glyph_id_array, _) = buffer.split_at(2 * entry_count as usize);
+
+        Ok(Format6 { language, first_code, glyph_id_array })
     }
 }
 
-// impl<'tbl> Format4<'tbl> {
-//     fn get_glyph_index(&self, codepoint: u32) -> u16 {
-//         // Perform a binary seach on the ranges.
-//         let
+impl<'tbl> Format6<'tbl> {
+    fn get_glyph_id(&self, codepoint: u32) -> Option<u16> {
+        let offset = match codepoint.checked_sub(self.first_code as u32) {
+            Some(offset) => 2 * offset as usize,
+            None => return None,
+        };
 
-//         let mut index: usize = 0;
-//         let mut min: usize = 0;
-//         let mut max: usize = (self.seg_count_x2 / 2) as usize - 1;
-//         let mut found = false;
-
-//         while min <= max {
-//             index = ((min + max) / 2) as usize;
-//             if codepoint > self.end_chars[index] {
-//                 min = index + 1;
-//             } else if codepoint < self.start_chars[index] {
-//                 max = index - 1;
-//             } else {
-//                 found = true;
-//                 break;
-//             }
-//         }
-
-//         if !found {
-//             return None;
-//         }
-
-//         if self.id_offset[index] != 0 {
-//             panic!("Non-zero offset unsupported for now.");
-//         } else {
-//             let idx = (codepoint - self.start_chars[index] + self.id_delta[index]) as usize;
-//             Ok(idx)
-//         }
-//     }
-// }
-
-#[derive(Table, Debug)]
-pub struct Format6<'tbl> {
-    buffer: &'tbl [u8],
-    language: u16,
-    first_code: u16,
-    entry_count: u16,
+        if offset + 2 > self.glyph_id_array.len() {
+            None
+        } else {
+            let (_, mut buf) = self.glyph_id_array.split_at(offset);
+            let result = buf.read::<u16>().unwrap();
+            Some(result)
+        }
+    }
 }
 
-#[derive(Table, Debug)]
+#[derive(Debug)]
 pub struct Format12<'tbl> {
-    buffer: &'tbl [u8],
     language: u32,
-    num_groups: u32,
+    groups: &'tbl [u8],
+}
+
+impl<'tbl> Table<'tbl> for Format12<'tbl> {
+    fn parse(mut buffer: &'tbl [u8]) -> Result<Format12<'tbl>> {
+        if buffer.len() < 12 {
+            return Err(Error::UnexpectedEof)
+        }
+
+        let _ /* length */ = buffer.read::<u32>()?;
+        let language = buffer.read::<u32>()?;
+        let num_groups = buffer.read::<u32>()? as usize;
+        let size = SequentialMapGroup::size() * num_groups;
+
+        if buffer.len() < size {
+            return Err(Error::UnexpectedEof)
+        }
+
+        let (groups, _) = buffer.split_at(size);
+
+        Ok(Format12 { language, groups })
+    }
+}
+
+impl<'tbl> Format12<'tbl> {
+    fn get_glyph_id(&self, codepoint: u32) -> Option<u16> {
+        let mut buffer = self.groups;
+        // TODO: This should be a binary search. There can be a _lot_
+        // of groups here.  Ie: SourceHanSansSC-Regular has 16,490.
+        while buffer.len() > SequentialMapGroup::size() {
+            let seq_map = buffer.read_table::<SequentialMapGroup>().unwrap();
+            if let Some(id) = seq_map.get_glyph_id(codepoint) {
+                return Some(id)
+            }
+        }
+
+        None
+    }
 }
 
 #[derive(Table, Debug)]
@@ -343,6 +343,24 @@ pub struct SequentialMapGroup {
     start_char_code: u32,
     end_char_code: u32,
     start_glyph_id: u32,
+}
+
+impl SequentialMapGroup {
+    pub fn contains(&self, codepoint: u32) -> bool {
+        self.start_char_code <= codepoint
+        && codepoint <= self.end_char_code
+    }
+
+    pub fn get_glyph_id(&self, codepoint: u32) -> Option<u16> {
+        match self.contains(codepoint) {
+            true => {
+                let diff = codepoint - self.start_glyph_id;
+                Some(self.start_glyph_id as u16 + diff as u16)
+            },
+
+            false => None,
+        }
+    }
 }
 
 #[test]
@@ -364,4 +382,29 @@ fn list_cmaps() {
         (1, 0, 148) Format: 0,
         (3, 1, 28)  Format: 4,
     );
+}
+
+#[test]
+fn format4() {
+    use font::Font;
+    let buf: Vec<u8> = open_font!(r"data/DroidSerif.ttf");
+
+    let font = Font::from_buffer(&buf).expect("unable to parse font");
+    let tbl = font.get_table::<CmapHeader>()
+        .expect("Failed to read Cmap Header table");
+
+    let cmap = tbl.records()
+        .expect("Failed to generated Cmap Records iter")
+        .next()
+        .expect("Failed to parse cmap record header");
+
+    let cmap = match cmap.get_cmap().expect("failed to read cmap record") {
+        Cmap::Format4(c) => c,
+        _ => panic!("format 4 should be the first record"),
+    };
+
+    assert!((b' '..b'~')
+        .map(|c| cmap.get_glyph_id(c as u32).unwrap())
+        .eq(3..97),
+        "cmap lookup failed");
 }
