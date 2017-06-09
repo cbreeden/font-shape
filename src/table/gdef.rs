@@ -11,20 +11,6 @@ pub struct Header<'tbl> {
     pub item_var_store: Option<&'tbl [u8]>,
 }
 
-macro_rules! offset_maybe_null {
-    ($head:expr, $buffer:expr) => ({
-        let offset = $buffer.read::<u16>()?;
-        match offset {
-            0 => None,
-            x if $head.len() < x as usize => return Err(Error::UnexpectedEof),
-            x => {
-                let (_, tbl) = $head.split_at(x as usize);
-                Some(tbl)
-            }
-        }
-    })
-}
-
 impl<'tbl> Table<'tbl> for Header<'tbl> {
     fn parse(mut buffer: &[u8]) -> Result<Header> {
         if buffer.len() < 12 /* Version 1.0 size */ {

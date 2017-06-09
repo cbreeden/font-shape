@@ -6,6 +6,7 @@ pub mod name;
 pub mod cmap;
 pub mod glyf;
 pub mod gdef;
+pub mod gpos;
 
 use decode::primitives::Tag;
 use decode::Table;

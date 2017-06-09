@@ -14,6 +14,20 @@ macro_rules! verify {
     }
 }
 
+macro_rules! offset_maybe_null {
+    ($head:expr, $buffer:expr) => ({
+        let offset = $buffer.read::<u16>()?;
+        match offset {
+            0 => None,
+            x if $head.len() < x as usize => return Err(Error::UnexpectedEof),
+            x => {
+                let (_, tbl) = $head.split_at(x as usize);
+                Some(tbl)
+            }
+        }
+    })
+}
+
 macro_rules! _offset {
     (NUL) => { 0 };
 
