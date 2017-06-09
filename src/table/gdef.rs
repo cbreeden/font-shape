@@ -116,3 +116,83 @@ impl<'tbl> Table<'tbl> for AttachPoint<'tbl> {
         Ok(AttachPoint { point_index })
     }
 }
+
+pub struct LigCaretList<'tbl> {
+    coverage: &'tbl [u8],
+    lig_glyph: &'tbl [u8],
+}
+
+impl<'tbl> Table<'tbl> for LigCaretList<'tbl> {
+    fn parse(mut buffer: &[u8]) -> Result<LigCaretList> {
+        if buffer.len() < 4 {
+            return Err(Error::UnexpectedEof)
+        }
+
+        let head = buffer;
+        let coverage_offset = buffer.read::<u16>()?;
+        let glyph_count_size = 2 * buffer.read::<u16>()? as usize;
+
+        if buffer.len() < coverage_offset as usize {
+            return Err(Error::UnexpectedEof)
+        }
+
+        let (_, coverage) = head.split_at(coverage_offset as usize);
+
+        if buffer.len() < glyph_count_size {
+            return Err(Error::UnexpectedEof)
+        }
+
+        let (lig_glyph, _) = buffer.split_at(glyph_count_size);
+
+        Ok(LigCaretList { coverage, lig_glyph })
+    }
+}
+
+enum CaretValue<'tbl> {
+    Coordinate(u16),
+    ContourPoint(u16),
+    DeviceTable {
+        value: u16,
+        device_table: &'tbl [u8],
+    },
+}
+
+impl<'tbl> Table<'tbl> for CaretValue<'tbl> {
+    fn parse(mut buffer: &[u8]) -> Result<CaretValue> {
+        let head = buffer;
+        let format = buffer.read::<u16>()?;
+        let value = buffer.read::<u16>()?;
+
+        Ok(match format {
+            1 => CaretValue::Coordinate(value),
+            2 => CaretValue::ContourPoint(value),
+            3 => {
+                if head.len() < value as usize {
+                    return Err(Error::UnexpectedEof)
+                }
+                let (_, device_table) = buffer.split_at(value as usize);
+                CaretValue::DeviceTable { value, device_table }
+            }
+            _ => return Err(Error::InvalidData)
+        })
+    }
+}
+
+pub struct MarkGlyphSets<'tbl> {
+    coverage: &'tbl [u8],
+}
+
+impl<'tbl> Table<'tbl> for MarkGlyphSets<'tbl> {
+    fn parse(mut buffer: &[u8]) -> Result<MarkGlyphSets> {
+        required_len!(buffer, 4);
+        let format = buffer.read::<u16>()?;
+        let coverage_size = 4 * buffer.read::<u16>()? as usize;
+        verify!(format == 1);
+        required_len!(buffer, coverage_size);
+        let (coverage, _) = buffer.split_at(coverage_size);
+
+        Ok(MarkGlyphSets { coverage })
+    }
+}
+
+// TODO: Item Variation Store Table, ref: https://www.microsoft.com/typography/otspec/otvaroverview.htm

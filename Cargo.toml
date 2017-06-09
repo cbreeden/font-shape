@@ -8,3 +8,4 @@ table_derive = { path = "table_derive/" }
 byteorder = "*"
 derive_more = "*"
 bitflags = "*"
+min_max_macros = "0.1.1"

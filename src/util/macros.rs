@@ -1,4 +1,18 @@
-#![allow(unused_macros)]
+macro_rules! required_len {
+    ($buffer:expr, $len:expr) => (
+        if $buffer.len() < $len {
+            return Err(Error::UnexpectedEof)
+        }
+    )
+}
+
+macro_rules! verify {
+    ($expr:expr) => {
+        if !$expr {
+            return Err(Error::InvalidData)
+        }
+    }
+}
 
 macro_rules! _offset {
     (NUL) => { 0 };

@@ -8,6 +8,8 @@ extern crate byteorder;
 extern crate table_derive;
 #[macro_use]
 extern crate bitflags;
+#[macro_use]
+extern crate min_max_macros;
 
 #[macro_use]
 pub mod util;
