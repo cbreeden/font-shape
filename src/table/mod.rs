@@ -4,6 +4,7 @@ pub mod maxp;
 pub mod os2;
 pub mod name;
 pub mod cmap;
+pub mod glyf;
 
 use decode::primitives::Tag;
 use decode::Table;
