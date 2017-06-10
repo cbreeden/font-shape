@@ -3,6 +3,9 @@ use decode::primitives::{Tag, Ignored};
 
 use table::TaggedTable;
 use table::name::Name;
+use table::hmtx::Hmtx;
+use table::maxp::Maxp;
+use table::hhea::Hhea;
 
 #[derive(Debug)]
 pub enum Version {
@@ -108,6 +111,32 @@ impl<'f> Font<'f> {
 
         match T::parse(buf) {
             Ok(tbl) => Some(tbl),
+            Err(_) => None,
+        }
+    }
+
+    pub fn get_table_hmtx(&self) -> Option<Hmtx> {
+        let offset = match self.get_table_offset(Tag(*b"hmtx")) {
+            Some(offset) => offset,
+            None => return None,
+        };
+
+        let hhea = match self.get_table::<Hhea>() {
+            Some(hhea) => hhea,
+            None => return None,
+        };
+
+        let num_h_glyphs = hhea.number_of_h_metrics;
+        let maxp = match self.get_table::<Maxp>() {
+            Some(maxp) => maxp,
+            None => return None,
+        };
+
+        let num_glyphs = maxp.get_num_glyphs();
+        let (_, buffer) = self.buf.split_at(offset);
+
+        match Hmtx::parse(buffer, num_glyphs, num_h_glyphs) {
+            Ok(h) => Some(h),
             Err(_) => None,
         }
     }

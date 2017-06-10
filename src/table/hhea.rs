@@ -21,7 +21,7 @@ pub struct Hhea {
     _reserved3: Ignored<u16>,
     _reserved4: Ignored<u16>,
     pub metric_data_format: i16,
-    pub number_of_h_metrics: i16,
+    pub number_of_h_metrics: u16,
 }
 
 #[cfg(test)]

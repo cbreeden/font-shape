@@ -28,6 +28,15 @@ impl<'tbl> Table<'tbl> for Maxp {
     }
 }
 
+impl Maxp {
+    pub fn get_num_glyphs(&self) -> u16 {
+        match *self {
+            Maxp::Version05 { num_glyphs } => num_glyphs,
+            Maxp::Version1(ref t) => t.num_glyphs,
+        }
+    }
+}
+
 #[derive(Debug, Table)]
 pub struct Version1 {
     pub num_glyphs: u16,

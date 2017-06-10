@@ -7,6 +7,7 @@ pub mod cmap;
 pub mod glyf;
 pub mod gdef;
 pub mod gpos;
+pub mod hmtx;
 
 use decode::primitives::Tag;
 use decode::Table;
