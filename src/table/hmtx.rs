@@ -32,20 +32,19 @@ impl<'tbl> Hmtx<'tbl> {
     fn get_record(&self, glyph_id: u16) -> Option<HorizontalMetricRecord> {
         let glyph_id = glyph_id as usize;
 
-        if glyph_id < self.h_metrics.len() / 4 {
+        if 4 * glyph_id < self.h_metrics.len() {
             let (_, mut record) = self.h_metrics.split_at(4 * glyph_id);
-            let hmtx = record.read_table::<HorizontalMetricRecord>().unwrap();
-            Some(hmtx)
-        } else if glyph_id < self.h_metrics.len() / 4
-                + self.left_side_bearing.len() {
-            let offset = glyph_id - self.h_metrics.len() / 4;
-            let (_, mut record) = self.left_side_bearing.split_at(2 * offset);
-            let lsb = record.read::<i16>().unwrap();
+            return record.read_table::<HorizontalMetricRecord>().ok();
+        }
 
-            Some(HorizontalMetricRecord {
-                advance_width: self.default_advance,
-                lsb: lsb
-            })
+        let diff = glyph_id - self.h_metrics.len() / 4;
+        if 2 * diff < self.left_side_bearing.len() {
+            let (_, mut record) = self.left_side_bearing.split_at(2 * diff);
+            record.read::<i16>().ok().map(|lsb|
+                HorizontalMetricRecord {
+                    advance_width: self.default_advance,
+                    lsb: lsb,
+                })
         } else {
             None
         }
