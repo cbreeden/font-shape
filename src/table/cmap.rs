@@ -25,12 +25,6 @@ impl<'a> Cmap<'a> {
     }
 }
 
-// impl<'tbl> Table<'tbl> for Cmap<'tbl> {
-//     fn parse(buffer: &[u8]) -> Result<Cmap<'tbl>> {
-//         unimplemented!()
-//     }
-// }
-
 #[derive(Table, Debug)]
 pub struct CmapHeader<'tbl> {
     buffer: &'tbl [u8],
@@ -38,8 +32,8 @@ pub struct CmapHeader<'tbl> {
     pub num_tables: u16,
 }
 
-impl<'a> CmapHeader<'a> {
-    pub fn records(&self) -> Result<RecordIter<'a>> {
+impl<'tbl> CmapHeader<'tbl> {
+    pub fn records(&self) -> Result<RecordIter<'tbl>> {
         required_len!(self.buffer,
             CmapHeader::size()
             + self.num_tables as usize * EncodingRecord::size());
@@ -50,6 +44,43 @@ impl<'a> CmapHeader<'a> {
                num_tables: self.num_tables,
                current: 0,
            })
+    }
+
+    pub fn get_default_cmap(&self) -> Option<Cmap<'tbl>> {
+        // This default has been taken from harfbuzz
+        // https://github.com/behdad/harfbuzz/blob/79e8e27ffd3da29ca27d3aebd2ef425bf1cb7f9d/src/hb-ot-font.cc#L356
+        macro_rules! return_if_have {
+            ($platform:expr, $encoding:expr) => (
+                match self.get_cmap_with($platform, $encoding) {
+                    Some(cmap) => return Some(cmap),
+                    None => { }
+                }
+            )
+        }
+
+        // 32-bit subtables
+        return_if_have!(3, 10);
+        return_if_have!(0, 6);
+        return_if_have!(0, 4);
+
+        // 16-bit subtables
+        return_if_have!(3, 1);
+        return_if_have!(0, 3);
+        return_if_have!(0, 2);
+        return_if_have!(0, 1);
+        return_if_have!(0, 0);
+
+        None
+    }
+
+    pub fn get_cmap_with(&self, platform: u16, encoding: u16) -> Option<Cmap<'tbl>> {
+        let mut recs = try_opt!(self.records().ok());
+
+        let rec = try_opt!(recs.find(|rec|
+            rec.platform == platform
+            && rec.encoding == encoding));
+
+        rec.get_cmap().ok()
     }
 }
 
@@ -136,7 +167,7 @@ impl<'a> EncodingRecord<'a> {
             4 => Ok(Cmap::Format4(Format4::parse(buffer)?)),
             6 => Ok(Cmap::Format6(Format6::parse(buffer)?)),
             12 => Ok(Cmap::Format12(Format12::parse(buffer)?)),
-            _ => panic!(format!("unsupported cmap version: {}", version)),
+            _ => Err(Error::UnsupportedCmapFormat),
         }
     }
 }
@@ -350,26 +381,26 @@ impl SequentialMapGroup {
     }
 }
 
-#[test]
-fn list_cmaps() {
-    use font::Font;
-    let buf: Vec<u8> = open_font!(r"data/DroidSerif.ttf");
+// #[test]
+// fn list_cmaps() {
+//     use font::Font;
+//     let buf: Vec<u8> = open_font!(r"data/DroidSerif.ttf");
 
-    let font = Font::from_buffer(&buf).expect("unable to parse font");
-    let tbl = font.get_table::<CmapHeader>()
-        .expect("Failed to read Cmap Header table");
+//     let font = Font::from_buffer(&buf).expect("unable to parse font");
+//     let tbl = font.get_table::<CmapHeader>()
+//         .expect("Failed to read Cmap Header table");
 
-    assert_eq!(tbl.num_tables, 3);
+//     assert_eq!(tbl.num_tables, 3);
 
-    let mut records = tbl.records()
-        .expect("Failed to generated Cmap Records iter");
+//     let mut records = tbl.records()
+//         .expect("Failed to generated Cmap Records iter");
 
-    assert_cmap_records!(records,
-        (0, 3, 28)  Format: 4,
-        (1, 0, 148) Format: 0,
-        (3, 1, 28)  Format: 4,
-    );
-}
+//     assert_cmap_records!(records,
+//         (0, 3, 28)  Format: 4,
+//         (1, 0, 148) Format: 0,
+//         (3, 1, 28)  Format: 4,
+//     );
+// }
 
 #[test]
 fn format4() {
@@ -389,6 +420,27 @@ fn format4() {
         Cmap::Format4(c) => c,
         _ => panic!("format 4 should be the first record"),
     };
+
+    assert!((b' '..b'~')
+        .map(|c| cmap.get_glyph_id(c as u32).unwrap())
+        .eq(3..97),
+        "cmap lookup failed");
+}
+
+#[test]
+fn default_cmap() {
+    use font::Font;
+    let buf: Vec<u8> = open_font!(r"data/DroidSerif.ttf");
+    let font = Font::from_buffer(&buf).expect("unable to parse font");
+
+    let cmap = font.get_table::<CmapHeader>()
+        .expect("Failed to read Cmap Header table")
+        .get_default_cmap()
+        .expect("Failed to find a default cmap");
+
+    assert_eq!(cmap.format(), 4);
+    assert_eq!(cmap.get_glyph_id(b' ' as u32), Some(3));
+    assert_eq!(cmap.get_glyph_id(b'~' as u32), Some(97));
 
     assert!((b' '..b'~')
         .map(|c| cmap.get_glyph_id(c as u32).unwrap())

@@ -10,6 +10,8 @@ extern crate table_derive;
 extern crate bitflags;
 #[macro_use]
 extern crate min_max_macros;
+#[macro_use]
+extern crate try_opt;
 
 #[macro_use]
 pub mod util;
