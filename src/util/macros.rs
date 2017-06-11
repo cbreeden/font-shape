@@ -118,7 +118,7 @@ macro_rules! assert_cmap_records {
                     assert_eq!(rec.platform, $platform);
                     assert_eq!(rec.encoding, $encoding);
                     assert_eq!(rec.offset, $offset);
-                    assert_eq!(rec.get_cmap().unwrap().format(), $fmt);
+                    assert_eq!(rec.get_cmap().ok().map(|cmap| cmap.format()), $fmt);
                 },
                 _ => panic!("Fewer cmap records than expected"),
             }

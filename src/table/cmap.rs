@@ -381,26 +381,26 @@ impl SequentialMapGroup {
     }
 }
 
-// #[test]
-// fn list_cmaps() {
-//     use font::Font;
-//     let buf: Vec<u8> = open_font!(r"data/DroidSerif.ttf");
+#[test]
+fn list_cmaps() {
+    use font::Font;
+    let buf: Vec<u8> = open_font!(r"data/DroidSerif.ttf");
 
-//     let font = Font::from_buffer(&buf).expect("unable to parse font");
-//     let tbl = font.get_table::<CmapHeader>()
-//         .expect("Failed to read Cmap Header table");
+    let font = Font::from_buffer(&buf).expect("unable to parse font");
+    let tbl = font.get_table::<CmapHeader>()
+        .expect("Failed to read Cmap Header table");
 
-//     assert_eq!(tbl.num_tables, 3);
+    assert_eq!(tbl.num_tables, 3);
 
-//     let mut records = tbl.records()
-//         .expect("Failed to generated Cmap Records iter");
+    let mut records = tbl.records()
+        .expect("Failed to generated Cmap Records iter");
 
-//     assert_cmap_records!(records,
-//         (0, 3, 28)  Format: 4,
-//         (1, 0, 148) Format: 0,
-//         (3, 1, 28)  Format: 4,
-//     );
-// }
+    assert_cmap_records!(records,
+        (0, 3, 28)  Format: Some(4),
+        (1, 0, 148) Format: None,    // format 0
+        (3, 1, 28)  Format: Some(4),
+    );
+}
 
 #[test]
 fn format4() {
