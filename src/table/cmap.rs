@@ -16,7 +16,7 @@ impl<'a> Cmap<'a> {
         }
     }
 
-    fn get_glyph_id(&self, codepoint: u32) -> Option<u16> {
+    pub fn get_glyph_id(&self, codepoint: u32) -> Option<u16> {
         match *self {
             Cmap::Format4(ref cm) => cm.get_glyph_id(codepoint),
             Cmap::Format6(ref cm) => cm.get_glyph_id(codepoint),
