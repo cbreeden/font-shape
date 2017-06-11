@@ -54,8 +54,7 @@ impl<'tbl> CmapHeader<'tbl> {
                 match self.get_cmap_with($platform, $encoding) {
                     Some(cmap) => return Some(cmap),
                     None => { }
-                }
-            )
+                })
         }
 
         // 32-bit subtables
@@ -442,8 +441,9 @@ fn default_cmap() {
     assert_eq!(cmap.get_glyph_id(b' ' as u32), Some(3));
     assert_eq!(cmap.get_glyph_id(b'~' as u32), Some(97));
 
-    assert!((b' '..b'~')
-        .map(|c| cmap.get_glyph_id(c as u32).unwrap())
-        .eq(3..97),
+    assert!(
+        (b' '..b'~')
+            .map(|c| cmap.get_glyph_id(c as u32).unwrap())
+            .eq(3..97),
         "cmap lookup failed");
 }
