@@ -21,7 +21,6 @@ impl<'a> Cmap<'a> {
             Cmap::Format4(ref cm) => cm.get_glyph_id(codepoint),
             Cmap::Format6(ref cm) => cm.get_glyph_id(codepoint),
             Cmap::Format12(ref cm) => cm.get_glyph_id(codepoint),
-            _ => panic!("this cmap format is not implemented"),
         }
     }
 }
@@ -41,11 +40,9 @@ pub struct CmapHeader<'tbl> {
 
 impl<'a> CmapHeader<'a> {
     pub fn records(&self) -> Result<RecordIter<'a>> {
-        let required_size = CmapHeader::size() + self.num_tables as usize * EncodingRecord::size();
-
-        if self.buffer.len() < required_size {
-            return Err(Error::UnexpectedEof);
-        }
+        required_len!(self.buffer,
+            CmapHeader::size()
+            + self.num_tables as usize * EncodingRecord::size());
 
         Ok(RecordIter {
                inherited: self.buffer,
